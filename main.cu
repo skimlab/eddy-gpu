@@ -2156,7 +2156,7 @@ int main(int argc, char *argv[])
 	int classids[5000];
 	char class1[50], class2[50];
 	char genenames[20500][16]; //used to be [20000][10]- not big enough --> changed stack size to 1.5MB
-	int genesetindexintodata[50];
+	int genesetindexintodata[200]; //updated size from 50 to accomodate more genes
 	//int classindexintodata[100][2];
 	int i, j;// , index;
 	//int jindex1, jindex2;
