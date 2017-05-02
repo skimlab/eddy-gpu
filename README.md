@@ -2,7 +2,7 @@
 EDDY-GPU is a parallel implementation  of the EDDY (Evaluation of Differential DependencY) algorithm developed by the Biocomputing Lab at TGen. It is to be used with NVIDIA's CUDA API for GPUs. The original paper can be found at https://www.ncbi.nlm.nih.gov/pubmed/24500204. The EDDY website can be found at http://biocomputing.tgen.org/software/EDDY/index.html.  
 # Dependencies
 eddy-gpu requires the Boost C++ library - boost/math/special_functions/ - for its ibetac function. Make sure Boost is installed before running eddy-gpu.
-# Running eddy-gpu
+# Compiling
 Compile:
 
 ```nvcc -o executable_name -I boost_include_path -L boost_library_path  main.cu```
@@ -10,6 +10,11 @@ Compile:
 On Texas Advanced Computing Center's (TACC) Maverick cluster compiling eddy-gpu is:
 
 ```nvcc -o eddy -I /opt/apps/intel14/boost/1.51.0/include -L /opt/apps/intel14/boost/1.51.0/lib main.cu kernel.cu```
+
+If nvcc is not listed as a command, you must load the CUDA module. For TACC Maverick, to load cuda version 7.5:
+
+```module load cuda/7.5```
+
 # Running
 eddy-gpu has the following command line parameters:
 
