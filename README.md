@@ -9,7 +9,7 @@ Compile:
 
 On Texas Advanced Computing Center's (TACC) Maverick cluster compiling eddy-gpu is:
 
-``` nvcc -o eddy -I /opt/apps/intel14/boost/1.51.9/include -L /opt/apps/intel14/boost/1.51.0/lib main.cu```
+```nvcc -o eddy -I /opt/apps/intel14/boost/1.51.0/include -L /opt/apps/intel14/boost/1.51.0/lib main.cu kernel.cu```
 # Running
 eddy-gpu has the following command line parameters:
 
