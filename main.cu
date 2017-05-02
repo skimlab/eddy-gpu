@@ -578,6 +578,263 @@ __host__ void checkParentLimit(int numNetworks, int numNodes, int maxParents, in
 	}
 }
 
+__host__ void compute_likelihood(int scaler, int noNodes, double *out5, double *lval1)
+{
+	for(int g = 0; g < 2; g++){
+		int set = 0;
+		int place = 0;
+		double scoreSum = 0;
+		double *likeli1;
+		double min = 0;
+		double max = 0;
+		double inAlpha = 0;
+		double probScale = 0;
+		double likeliSum = 0;
+		double nonInf = 0;
+		double *dist;
+
+		double *adjusted;
+		double *infFlag;
+		double *outq;
+		int localoffset;
+		outq = out5;
+		if (g < 1){
+			localoffset = 0;
+		}
+		else
+		{
+			localoffset = scaler;
+		}
+
+		dist = (double *)malloc(sizeof(double)*scaler);
+		likeli1 = (double *)malloc(sizeof(double)*scaler);
+		adjusted = (double *)malloc(sizeof(double)*scaler);
+		infFlag = (double *)malloc(sizeof(double)*scaler);
+		for (int k2 = 0; k2 < scaler; k2++){
+
+			dist[k2] = 0.0;
+
+			adjusted[k2] = 0.0;
+			infFlag[k2] = 0.0;
+
+		}
+		for (int i = 0; i < scaler*noNodes; i++){
+
+			dist[place] += outq[i + localoffset*noNodes];
+			set++;
+			if (set == noNodes){
+				set = 0;
+				place++;
+			}
+		}
+
+		min = dist[0];
+		max = dist[0];
+		for (int j3 = 0; j3 < scaler; j3++){
+					//			printf(" dis %d %f \n", j3, dist[j3]);
+			scoreSum += dist[j3];
+			if (dist[j3]>max){
+
+				max = dist[j3];
+			}
+			if (dist[j3] < min){
+
+				min = dist[j3];
+			}
+
+		}
+
+
+		inAlpha = -1 * (scoreSum / scaler);
+		//printf("\n min-%f max-%f", min, max);
+		//printf("inAlpha-%f", inAlpha);
+		probScale = (10) / (max - min);
+
+		for (int m = 0; m < scaler; m++){
+
+			adjusted[m] = (dist[m] + inAlpha)*probScale;
+			//			printf("\n adjusted: %f", adjusted[m]);
+			likeli1[m] = exp(adjusted[m]);
+			//			printf("\n likeli: %f", likeli1[m]);
+			nonInf += likeli1[m];
+			//likeLi[m] = posInf;
+			//suppress overflow infinity error
+			#pragma warning(suppress: 4056)
+			if (likeli1[m] >= INFINITY || likeli1[m] <= -INFINITY){
+				infFlag[m] = 1.0;
+				likeliSum++;
+			}
+
+		}
+		free(dist); dist = NULL;
+		free(adjusted); adjusted = NULL;
+		//	printf("\n likesum: %f nonInf: %f", likeliSum, nonInf);
+
+		if (likeliSum == 0){
+			for (int meow = 0; meow < scaler; meow++){
+				likeli1[meow] = likeli1[meow] / nonInf;
+				lval1[meow + localoffset] = likeli1[meow];
+
+			}
+
+		}
+		else{
+			for (int meow = 0; meow < scaler; meow++){
+				likeli1[meow] = infFlag[meow] / likeliSum;
+				lval1[meow + localoffset] = likeli1[meow];
+			}
+		}
+		free(likeli1); likeli1 = NULL;
+		free(infFlag); infFlag = NULL;
+		outq = NULL;
+	}
+
+}
+
+int calculate_edges(int scalerSum, int samples, int samples2, int genesetlength, int size2, int c, int genes, int *transferdata1, int *transferdata2, int *ff1, int *priorMatrix, int *spacer1, cudaEvent_t start, cudaEvent_t stop, float time, double pw, int *edgeListData1, int *edgeListData2, int *dout23, int *dedgesPN, int *dtriA, int *dtriAb, int *ddofout, int *dppn, int *dstf, int *dff, int *dspacr, int *dpriorMatrix, int numclass1, int numclass2, int permNum)
+{
+	////space alloc for device
+	//HANDLE_ERROR(cudaMalloc((void **)&dtriA, genesetlength*samples*sizeof(int)));
+	//HANDLE_ERROR(cudaMalloc((void **)&dtriAb, genesetlength*samples2*sizeof(int)));
+	//HANDLE_ERROR(cudaMalloc((void **)&dppn, genesetlength * 2 * sizeof(int)));
+	//HANDLE_ERROR(cudaMalloc((void **)&dstf, genesetlength * 2 * 3 * sizeof(int)));
+	//HANDLE_ERROR(cudaMalloc((void **)&ddofout, size2));
+	//HANDLE_ERROR(cudaMalloc((void **)&dff, c*sizeof(int)));
+	//HANDLE_ERROR(cudaMalloc((void **)&dspacr, c*sizeof(int)));
+	////cudaMalloc((void **)&d_ones, onesSize);
+	//HANDLE_ERROR(cudaMalloc((void **)&dout23, sizeof(int) * c * scalerSum));
+	//HANDLE_ERROR(cudaMalloc((void **)&dedgesPN, sizeof(int) * (scalerSum + 1)));
+	//HANDLE_ERROR(cudaMalloc((void **)&dpriorMatrix, sizeof(int) * genesetlength * genesetlength));
+			
+
+	//copy into device 
+	assert(genes*samples*sizeof(int) == genesetlength * numclass1 * sizeof(int));
+	assert(genes*samples2*sizeof(int) == genesetlength * numclass2 * sizeof(int));
+	HANDLE_ERROR(cudaMemcpy(dtriA, transferdata1, genes*samples*sizeof(int), cudaMemcpyHostToDevice));
+	HANDLE_ERROR(cudaMemcpy(dtriAb, transferdata2, genes*samples2*sizeof(int), cudaMemcpyHostToDevice));
+	HANDLE_ERROR(cudaMemcpy(dff, ff1, c*sizeof(int), cudaMemcpyHostToDevice));
+	HANDLE_ERROR(cudaMemcpy(dspacr, spacer1, c*sizeof(int), cudaMemcpyHostToDevice));
+	HANDLE_ERROR(cudaMemcpy(dpriorMatrix, priorMatrix, genesetlength * genesetlength * sizeof(int), cudaMemcpyHostToDevice));
+			
+			
+
+	//no longer used once copied to GPU
+	free(spacer1); spacer1 = NULL;
+	free(ff1); ff1 = NULL;
+
+	//deploy
+	//int milliSecondsElapsed1 = getMilliSpan(start1);
+	//int start2 = getMilliCount();
+	int sampleSum = samples + samples2 + 2;
+	//printf("samples : %d\n", samples);
+
+			
+			
+	//run no states in separate kernel to avoid threading
+	//noStates_kernel <<<genes * 2, 1 >>>(genes, samples, samples2, dtriA, dtriAb, dppn, dstf);
+
+
+
+
+
+	cudaEventRecord(start, 0);
+	//printf("c = %d\n", c);
+	if( c < MAX_THREADS)
+	{
+	run2 << <sampleSum, c, genes * genes * sizeof(int) >> >(genes, samples, samples2, dtriA, dtriAb, dspacr, dff, ddofout, dppn, dstf, dout23, c, dpriorMatrix, pw);
+	}
+	else
+	{
+		int BPN = ceil((c * 1.0) / MAX_THREADS);
+		int TPB = ceil((c * 1.0) / BPN);
+			
+		//printf("launching with %d blocks per network and %d threads per block\n", BPN, TPB);
+		run2Scalable <<< sampleSum * BPN, TPB>>>(genes, samples, samples2, dtriA, dtriAb,dspacr, dff, ddofout, dppn, dstf, dout23, c, dpriorMatrix, pw, BPN, TPB);
+		//printf("run2Scalable completed\n");
+	}
+
+
+	//test ppn/stf
+	/*int *tempPpn = (int *)malloc(sizeof(int) * 2 * genesetlength);
+	int *tempStf = (int *)malloc(sizeof(int) * 2 * 3 * genesetlength);
+	cudaMemcpy(tempPpn, dppn, sizeof(int) * 2 * genesetlength, cudaMemcpyDeviceToHost);
+	cudaMemcpy(tempStf, dstf, sizeof(int) * 2 * 3 * genesetlength, cudaMemcpyDeviceToHost);
+	for (int i = 0; i < 2 * genesetlength; i++)
+	{
+		printf("ppn[%d] : %d\n", i, tempPpn[i]);
+	}
+	for (int i = 0; i < 2 * 3 * genesetlength; i++)
+	{
+		printf("stf[%d] : %d\n", i, tempStf[i]);
+	}*/
+
+	//printf("run2 finished\n");
+	//cudaError_t errSync = cudaGetLastError();
+	//if (errSync != cudaSuccess)
+	//{
+	//	printf("%s\n", cudaGetErrorString(errSync));
+	//}
+	cudaEventRecord(stop, 0);
+	cudaEventSynchronize(stop);
+	cudaEventElapsedTime(&time, start, stop);
+	//printf("Run 2 Time : %f\n", time);
+
+	if (permNum == 0)
+	{
+		//holds post run2 edge data for edge list calculations after permutations
+		edgeListData1 = (int *)malloc(sizeof(int) * c);
+		edgeListData2 = (int *)malloc(sizeof(int) * c);
+
+		//host array to transfer output of run2 to edgeListData1/edgeListData2
+		int *tempOut23 = (int *)malloc(sizeof(int) * c * scalerSum);
+				
+
+		//copy binary data back to CPU
+		HANDLE_ERROR(cudaMemcpy(tempOut23, dout23, sizeof(int) * c * scalerSum, cudaMemcpyDeviceToHost));
+				
+
+		//first network in first class - no samples left out
+		for (int i = 0; i < c; i++)
+		{
+			//load 1st network from class 1
+			edgeListData1[i] = tempOut23[i];
+		}
+		int count = 0;
+		//last network in 2nd class - no samples left out
+		for (int i = (scalerSum - 1) * c; i < (scalerSum) * c; i++)
+		{
+			edgeListData2[count++] = tempOut23[i];
+		}
+			
+
+
+		////copy data for the first network in the first class
+		//int *ptr1 = &tempOut23[0];
+		//memcpy(edgeListData1, ptr1, sizeof(int) * c);
+		////copy data for the first network in the second class
+		//printf("2nd memcpy starting point : %d\n", scaler * c);
+		////int *ptr2 = &tempOut23[scaler * c];
+		//int *ptr2 = &tempOut23[(scaler) * c];
+		//memcpy(edgeListData2, ptr2, sizeof(int) * c);
+		//ptr1 = NULL;
+		//ptr2 = NULL;
+
+		free(tempOut23); tempOut23 = NULL;
+	}
+
+
+
+	//int milliSecondsElapsed2 = getMilliSpan(start2);
+	//int start3 = getMilliCount();
+	return sampleSum;
+}
+
+
+
+
+
+
+
 
 int main(int argc, char *argv[])
 {
@@ -616,7 +873,7 @@ int main(int argc, char *argv[])
 	}
 
 	int startT = getMilliCount();
-	int start1 = getMilliCount();
+	//int start1 = getMilliCount();
 	//data grab routine *************************************************************************************
 	//command line arguments parser--------------------------------------------------------------------------
 
@@ -1223,141 +1480,157 @@ int main(int argc, char *argv[])
 			//mem sizes required
 			int size2 = c*((samples2 + 1) + (samples + 1))*sizeof(int);
 			//int size3 = c*((samples2 + 1) + (samples + 1))*sizeof(double);
-			int dppnLength = genesetlength * 2;
+			//need to malloc stuff before we can use it
 			////space alloc for device
-			HANDLE_ERROR(cudaMalloc((void **)&dtriA, genesetlength*samples*sizeof(int)));
-			HANDLE_ERROR(cudaMalloc((void **)&dtriAb, genesetlength*samples2*sizeof(int)));
-			HANDLE_ERROR(cudaMalloc((void **)&dppn, genesetlength * 2 * sizeof(int)));
-			HANDLE_ERROR(cudaMalloc((void **)&dstf, genesetlength * 2 * 3 * sizeof(int)));
-			HANDLE_ERROR(cudaMalloc((void **)&ddofout, size2));
-			HANDLE_ERROR(cudaMalloc((void **)&dff, c*sizeof(int)));
-			HANDLE_ERROR(cudaMalloc((void **)&dspacr, c*sizeof(int)));
-			//cudaMalloc((void **)&d_ones, onesSize);
-			HANDLE_ERROR(cudaMalloc((void **)&dout23, sizeof(int) * c * scalerSum));
-			HANDLE_ERROR(cudaMalloc((void **)&dedgesPN, sizeof(int) * (scalerSum + 1)));
-
-			HANDLE_ERROR(cudaMalloc((void **)&dpriorMatrix, sizeof(int) * genesetlength * genesetlength));
-			
-
-			//copy into device 
-			assert(genes*samples*sizeof(int) == genesetlength * numclass1 * sizeof(int));
-			assert(genes*samples2*sizeof(int) == genesetlength * numclass2 * sizeof(int));
-			HANDLE_ERROR(cudaMemcpy(dtriA, transferdata1, genes*samples*sizeof(int), cudaMemcpyHostToDevice));
-			HANDLE_ERROR(cudaMemcpy(dtriAb, transferdata2, genes*samples2*sizeof(int), cudaMemcpyHostToDevice));
-			HANDLE_ERROR(cudaMemcpy(dff, ff1, c*sizeof(int), cudaMemcpyHostToDevice));
-			HANDLE_ERROR(cudaMemcpy(dspacr, spacer1, c*sizeof(int), cudaMemcpyHostToDevice));
-			HANDLE_ERROR(cudaMemcpy(dpriorMatrix, priorMatrix, genesetlength * genesetlength * sizeof(int), cudaMemcpyHostToDevice));
-			
-			
-
-			//no longer used once copied to GPU
-			free(spacer1); spacer1 = NULL;
-			free(ff1); ff1 = NULL;
-
-			//deploy
-			int milliSecondsElapsed1 = getMilliSpan(start1);
-			int start2 = getMilliCount();
-			int sampleSum = samples + samples2 + 2;
-			//printf("samples : %d\n", samples);
-
-			
-			
-			//run no states in separate kernel to avoid threading
-			//noStates_kernel <<<genes * 2, 1 >>>(genes, samples, samples2, dtriA, dtriAb, dppn, dstf);
-
-
-
-
-
-			cudaEventRecord(start, 0);
-			//printf("c = %d\n", c);
-			if( c < MAX_THREADS)
-			{
-			run2 << <sampleSum, c, genes * genes * sizeof(int) >> >(genes, samples, samples2, dtriA, dtriAb, dspacr, dff, ddofout, dppn, dstf, dout23, c, dpriorMatrix, pw);
-			}
-			else
-			{
-				int BPN = ceil((c * 1.0) / MAX_THREADS);
-				int TPB = ceil((c * 1.0) / BPN);
-			
-				//printf("launching with %d blocks per network and %d threads per block\n", BPN, TPB);
-				run2Scalable <<< sampleSum * BPN, TPB>>>(genes, samples, samples2, dtriA, dtriAb,dspacr, dff, ddofout, dppn, dstf, dout23, c, dpriorMatrix, pw, BPN, TPB);
-				//printf("run2Scalable completed\n");
-			}
-
-
-			//test ppn/stf
-			/*int *tempPpn = (int *)malloc(sizeof(int) * 2 * genesetlength);
-			int *tempStf = (int *)malloc(sizeof(int) * 2 * 3 * genesetlength);
-			cudaMemcpy(tempPpn, dppn, sizeof(int) * 2 * genesetlength, cudaMemcpyDeviceToHost);
-			cudaMemcpy(tempStf, dstf, sizeof(int) * 2 * 3 * genesetlength, cudaMemcpyDeviceToHost);
-			for (int i = 0; i < 2 * genesetlength; i++)
-			{
-				printf("ppn[%d] : %d\n", i, tempPpn[i]);
-			}
-			for (int i = 0; i < 2 * 3 * genesetlength; i++)
-			{
-				printf("stf[%d] : %d\n", i, tempStf[i]);
-			}*/
-
-			//printf("run2 finished\n");
+        		HANDLE_ERROR(cudaMalloc((void **)&dtriA, genesetlength*samples*sizeof(int)));
+        		HANDLE_ERROR(cudaMalloc((void **)&dtriAb, genesetlength*samples2*sizeof(int)));
+        		HANDLE_ERROR(cudaMalloc((void **)&dppn, genesetlength * 2 * sizeof(int)));
+        		HANDLE_ERROR(cudaMalloc((void **)&dstf, genesetlength * 2 * 3 * sizeof(int)));
+        		HANDLE_ERROR(cudaMalloc((void **)&ddofout, size2));
+        		HANDLE_ERROR(cudaMalloc((void **)&dff, c*sizeof(int)));
+        		HANDLE_ERROR(cudaMalloc((void **)&dspacr, c*sizeof(int)));
+        		//cudaMalloc((void **)&d_ones, onesSize);
+        		HANDLE_ERROR(cudaMalloc((void **)&dout23, sizeof(int) * c * scalerSum));
+        		HANDLE_ERROR(cudaMalloc((void **)&dedgesPN, sizeof(int) * (scalerSum + 1)));
+        		HANDLE_ERROR(cudaMalloc((void **)&dpriorMatrix, sizeof(int) * genesetlength * genesetlength));			
+			int dppnLength = genesetlength * 2;
+			int sampleSum = calculate_edges(scalerSum, samples, samples2, genesetlength, size2, c, genes, transferdata1, transferdata2, ff1, priorMatrix, spacer1, start, stop, time, pw, edgeListData1, edgeListData2, dout23, dedgesPN, dtriA, dtriAb, ddofout, dppn, dstf, dff, dspacr, dpriorMatrix, numclass1, numclass2, permNum);
 			cudaError_t errSync = cudaGetLastError();
-			if (errSync != cudaSuccess)
-			{
-				printf("%s\n", cudaGetErrorString(errSync));
-			}
-			cudaEventRecord(stop, 0);
-			cudaEventSynchronize(stop);
-			cudaEventElapsedTime(&time, start, stop);
-			//printf("Run 2 Time : %f\n", time);
+			//int dppnLength = genesetlength * 2;
+			//////space alloc for device
+			//HANDLE_ERROR(cudaMalloc((void **)&dtriA, genesetlength*samples*sizeof(int)));
+			//HANDLE_ERROR(cudaMalloc((void **)&dtriAb, genesetlength*samples2*sizeof(int)));
+			//HANDLE_ERROR(cudaMalloc((void **)&dppn, genesetlength * 2 * sizeof(int)));
+			//HANDLE_ERROR(cudaMalloc((void **)&dstf, genesetlength * 2 * 3 * sizeof(int)));
+			//HANDLE_ERROR(cudaMalloc((void **)&ddofout, size2));
+			//HANDLE_ERROR(cudaMalloc((void **)&dff, c*sizeof(int)));
+			//HANDLE_ERROR(cudaMalloc((void **)&dspacr, c*sizeof(int)));
+			////cudaMalloc((void **)&d_ones, onesSize);
+			//HANDLE_ERROR(cudaMalloc((void **)&dout23, sizeof(int) * c * scalerSum));
+			//HANDLE_ERROR(cudaMalloc((void **)&dedgesPN, sizeof(int) * (scalerSum + 1)));
 
-			if (permNum == 0)
-			{
-				//holds post run2 edge data for edge list calculations after permutations
-				edgeListData1 = (int *)malloc(sizeof(int) * c);
-				edgeListData2 = (int *)malloc(sizeof(int) * c);
+			//HANDLE_ERROR(cudaMalloc((void **)&dpriorMatrix, sizeof(int) * genesetlength * genesetlength));
+			//
 
-				//host array to transfer output of run2 to edgeListData1/edgeListData2
-				int *tempOut23 = (int *)malloc(sizeof(int) * c * scalerSum);
-				
+			////copy into device 
+			//assert(genes*samples*sizeof(int) == genesetlength * numclass1 * sizeof(int));
+			//assert(genes*samples2*sizeof(int) == genesetlength * numclass2 * sizeof(int));
+			//HANDLE_ERROR(cudaMemcpy(dtriA, transferdata1, genes*samples*sizeof(int), cudaMemcpyHostToDevice));
+			//HANDLE_ERROR(cudaMemcpy(dtriAb, transferdata2, genes*samples2*sizeof(int), cudaMemcpyHostToDevice));
+			//HANDLE_ERROR(cudaMemcpy(dff, ff1, c*sizeof(int), cudaMemcpyHostToDevice));
+			//HANDLE_ERROR(cudaMemcpy(dspacr, spacer1, c*sizeof(int), cudaMemcpyHostToDevice));
+			//HANDLE_ERROR(cudaMemcpy(dpriorMatrix, priorMatrix, genesetlength * genesetlength * sizeof(int), cudaMemcpyHostToDevice));
+			//
+			//
 
-				//copy binary data back to CPU
-				HANDLE_ERROR(cudaMemcpy(tempOut23, dout23, sizeof(int) * c * scalerSum, cudaMemcpyDeviceToHost));
-				
+			////no longer used once copied to GPU
+			//free(spacer1); spacer1 = NULL;
+			//free(ff1); ff1 = NULL;
 
-				//first network in first class - no samples left out
-				for (int i = 0; i < c; i++)
-				{
-					//load 1st network from class 1
-					edgeListData1[i] = tempOut23[i];
-				}
-				int count = 0;
-				//last network in 2nd class - no samples left out
-				for (int i = (scalerSum - 1) * c; i < (scalerSum) * c; i++)
-				{
-					edgeListData2[count++] = tempOut23[i];
-				}
-			
+			////deploy main()
+			//int milliSecondsElapsed1 = getMilliSpan(start1);
+			//int start2 = getMilliCount();
+			//int sampleSum = samples + samples2 + 2;
+			////printf("samples : %d\n", samples);
 
-
-				////copy data for the first network in the first class
-				//int *ptr1 = &tempOut23[0];
-				//memcpy(edgeListData1, ptr1, sizeof(int) * c);
-				////copy data for the first network in the second class
-				//printf("2nd memcpy starting point : %d\n", scaler * c);
-				////int *ptr2 = &tempOut23[scaler * c];
-				//int *ptr2 = &tempOut23[(scaler) * c];
-				//memcpy(edgeListData2, ptr2, sizeof(int) * c);
-				//ptr1 = NULL;
-				//ptr2 = NULL;
-
-free(tempOut23); tempOut23 = NULL;
-			}
+			//
+			//
+			////run no states in separate kernel to avoid threading
+			////noStates_kernel <<<genes * 2, 1 >>>(genes, samples, samples2, dtriA, dtriAb, dppn, dstf);
 
 
 
-			int milliSecondsElapsed2 = getMilliSpan(start2);
-			int start3 = getMilliCount();
+
+
+			//cudaEventRecord(start, 0);
+			////printf("c = %d\n", c);
+			//if( c < MAX_THREADS)
+			//{
+			//run2 << <sampleSum, c, genes * genes * sizeof(int) >> >(genes, samples, samples2, dtriA, dtriAb, dspacr, dff, ddofout, dppn, dstf, dout23, c, dpriorMatrix, pw);
+			//}
+			//else
+			//{
+			//	int BPN = ceil((c * 1.0) / MAX_THREADS);
+			//	int TPB = ceil((c * 1.0) / BPN);
+			//
+			//	//printf("launching with %d blocks per network and %d threads per block\n", BPN, TPB);
+			//	run2Scalable <<< sampleSum * BPN, TPB>>>(genes, samples, samples2, dtriA, dtriAb,dspacr, dff, ddofout, dppn, dstf, dout23, c, dpriorMatrix, pw, BPN, TPB);
+			//	//printf("run2Scalable completed\n");
+			//}
+
+
+			////test ppn/stf
+			///*int *tempPpn = (int *)malloc(sizeof(int) * 2 * genesetlength);
+			//int *tempStf = (int *)malloc(sizeof(int) * 2 * 3 * genesetlength);
+			//cudaMemcpy(tempPpn, dppn, sizeof(int) * 2 * genesetlength, cudaMemcpyDeviceToHost);
+			//cudaMemcpy(tempStf, dstf, sizeof(int) * 2 * 3 * genesetlength, cudaMemcpyDeviceToHost);
+			//for (int i = 0; i < 2 * genesetlength; i++)
+			//{
+			//	printf("ppn[%d] : %d\n", i, tempPpn[i]);
+			//}
+			//for (int i = 0; i < 2 * 3 * genesetlength; i++)
+			//{
+			//	printf("stf[%d] : %d\n", i, tempStf[i]);
+			//}*/
+
+			////printf("run2 finished\n");
+			//cudaError_t errSync = cudaGetLastError();
+			//if (errSync != cudaSuccess)
+			//{
+			//	printf("%s\n", cudaGetErrorString(errSync));
+			//}
+			//cudaEventRecord(stop, 0);
+			//cudaEventSynchronize(stop);
+			//cudaEventElapsedTime(&time, start, stop);
+			////printf("Run 2 Time : %f\n", time);
+
+			//if (permNum == 0)
+			//{
+			//	//holds post run2 edge data for edge list calculations after permutations
+			//	edgeListData1 = (int *)malloc(sizeof(int) * c);
+			//	edgeListData2 = (int *)malloc(sizeof(int) * c);
+
+			//	//host array to transfer output of run2 to edgeListData1/edgeListData2
+			//	int *tempOut23 = (int *)malloc(sizeof(int) * c * scalerSum);
+			//	
+
+			//	//copy binary data back to CPU
+			//	HANDLE_ERROR(cudaMemcpy(tempOut23, dout23, sizeof(int) * c * scalerSum, cudaMemcpyDeviceToHost));
+			//	
+
+			//	//first network in first class - no samples left out
+			//	for (int i = 0; i < c; i++)
+			//	{
+			//		//load 1st network from class 1
+			//		edgeListData1[i] = tempOut23[i];
+			//	}
+			//	int count = 0;
+			//	//last network in 2nd class - no samples left out
+			//	for (int i = (scalerSum - 1) * c; i < (scalerSum) * c; i++)
+			//	{
+			//		edgeListData2[count++] = tempOut23[i];
+			//	}
+			//
+
+
+			//	////copy data for the first network in the first class
+			//	//int *ptr1 = &tempOut23[0];
+			//	//memcpy(edgeListData1, ptr1, sizeof(int) * c);
+			//	////copy data for the first network in the second class
+			//	//printf("2nd memcpy starting point : %d\n", scaler * c);
+			//	////int *ptr2 = &tempOut23[scaler * c];
+			//	//int *ptr2 = &tempOut23[(scaler) * c];
+			//	//memcpy(edgeListData2, ptr2, sizeof(int) * c);
+			//	//ptr1 = NULL;
+			//	//ptr2 = NULL;
+
+			//free(tempOut23); tempOut23 = NULL;
+			//}
+
+
+
+			//int milliSecondsElapsed2 = getMilliSpan(start2);
+			//int start3 = getMilliCount();
 
 
 
@@ -1794,119 +2067,120 @@ free(tempOut23); tempOut23 = NULL;
 			}
 
 			// compute likelihood of different dataset parsed by 2 iterations 
-			for (int g = 0; g < 2; g++){
-				int set = 0;
-				int place = 0;
-				double scoreSum = 0;
-				double *likeli1;
-				double min = 0;
-				double max = 0;
-				double inAlpha = 0;
-				double probScale = 0;
-				double likeliSum = 0;
-				double nonInf = 0;
-				double *dist;
-
-				double *adjusted;
-				double *infFlag;
-				double *outq;
-				int localoffset;
-				outq = out5;
-				if (g < 1){
-
-					localoffset = 0;
-				}
-				else
-				{
-
-					localoffset = scaler;
-
-				}
-
-				dist = (double *)malloc(sizeof(double)*scaler);
-				likeli1 = (double *)malloc(sizeof(double)*scaler);
-				adjusted = (double *)malloc(sizeof(double)*scaler);
-				infFlag = (double *)malloc(sizeof(double)*scaler);
-				for (int k2 = 0; k2 < scaler; k2++){
-
-					dist[k2] = 0.0;
-
-					adjusted[k2] = 0.0;
-					infFlag[k2] = 0.0;
-
-				}
-				for (int i = 0; i < scaler*noNodes; i++){
-
-					dist[place] += outq[i + localoffset*noNodes];
-					set++;
-					if (set == noNodes){
-						set = 0;
-						place++;
-					}
-				}
-
-				min = dist[0];
-				max = dist[0];
-				for (int j3 = 0; j3 < scaler; j3++){
-					//			printf(" dis %d %f \n", j3, dist[j3]);
-					scoreSum += dist[j3];
-					if (dist[j3]>max){
-
-						max = dist[j3];
-					}
-					if (dist[j3] < min){
-
-						min = dist[j3];
-					}
-
-				}
-
-
-				inAlpha = -1 * (scoreSum / scaler);
-				//printf("\n min-%f max-%f", min, max);
-				//printf("inAlpha-%f", inAlpha);
-				probScale = (10) / (max - min);
-
-				for (int m = 0; m < scaler; m++){
-
-					adjusted[m] = (dist[m] + inAlpha)*probScale;
-					//			printf("\n adjusted: %f", adjusted[m]);
-					likeli1[m] = exp(adjusted[m]);
-					//			printf("\n likeli: %f", likeli1[m]);
-					nonInf += likeli1[m];
-					//likeLi[m] = posInf;
-					//suppress overflow infinity error
-					#pragma warning(suppress: 4056)
-					if (likeli1[m] >= INFINITY || likeli1[m] <= -INFINITY){
-						infFlag[m] = 1.0;
-						likeliSum++;
-					}
-
-				}
-				free(dist); dist = NULL;
-				free(adjusted); adjusted = NULL;
-				//	printf("\n likesum: %f nonInf: %f", likeliSum, nonInf);
-
-				if (likeliSum == 0){
-					for (int meow = 0; meow < scaler; meow++){
-						likeli1[meow] = likeli1[meow] / nonInf;
-						lval1[meow + localoffset] = likeli1[meow];
-
-					}
-
-				}
-				else{
-					for (int meow = 0; meow < scaler; meow++){
-						likeli1[meow] = infFlag[meow] / likeliSum;
-						lval1[meow + localoffset] = likeli1[meow];
-					}
-				}
-
-				free(likeli1); likeli1 = NULL;
-				free(infFlag); infFlag = NULL;
-				outq = NULL;
-			}
-
+			compute_likelihood(scaler, noNodes, out5, lval1);
+//			for (int g = 0; g < 2; g++){
+//				int set = 0;
+//				int place = 0;
+//				double scoreSum = 0;
+//				double *likeli1;
+//				double min = 0;
+//				double max = 0;
+//				double inAlpha = 0;
+//				double probScale = 0;
+//				double likeliSum = 0;
+//				double nonInf = 0;
+//				double *dist;
+//
+//				double *adjusted;
+//				double *infFlag;
+//				double *outq;
+//				int localoffset;
+//				outq = out5;
+//				if (g < 1){
+//
+//					localoffset = 0;
+//				}
+//				else
+//				{
+//
+//					localoffset = scaler;
+//
+//				}
+//
+//				dist = (double *)malloc(sizeof(double)*scaler);
+//				likeli1 = (double *)malloc(sizeof(double)*scaler);
+//				adjusted = (double *)malloc(sizeof(double)*scaler);
+//				infFlag = (double *)malloc(sizeof(double)*scaler);
+//				for (int k2 = 0; k2 < scaler; k2++){
+//
+//					dist[k2] = 0.0;
+//
+//					adjusted[k2] = 0.0;
+//					infFlag[k2] = 0.0;
+//
+//				}
+//				for (int i = 0; i < scaler*noNodes; i++){
+//
+//					dist[place] += outq[i + localoffset*noNodes];
+//					set++;
+//					if (set == noNodes){
+//						set = 0;
+//						place++;
+//					}
+//				}
+//
+//				min = dist[0];
+//				max = dist[0];
+//				for (int j3 = 0; j3 < scaler; j3++){
+//					//			printf(" dis %d %f \n", j3, dist[j3]);
+//					scoreSum += dist[j3];
+//					if (dist[j3]>max){
+//
+//						max = dist[j3];
+//					}
+//					if (dist[j3] < min){
+//
+//						min = dist[j3];
+//					}
+//
+//				}
+//
+//
+//				inAlpha = -1 * (scoreSum / scaler);
+//				//printf("\n min-%f max-%f", min, max);
+//				//printf("inAlpha-%f", inAlpha);
+//				probScale = (10) / (max - min);
+//
+//				for (int m = 0; m < scaler; m++){
+//
+//					adjusted[m] = (dist[m] + inAlpha)*probScale;
+//					//			printf("\n adjusted: %f", adjusted[m]);
+//					likeli1[m] = exp(adjusted[m]);
+//					//			printf("\n likeli: %f", likeli1[m]);
+//					nonInf += likeli1[m];
+//					//likeLi[m] = posInf;
+//					//suppress overflow infinity error
+//					#pragma warning(suppress: 4056)
+//					if (likeli1[m] >= INFINITY || likeli1[m] <= -INFINITY){
+//						infFlag[m] = 1.0;
+//						likeliSum++;
+//					}
+//
+//				}
+//				free(dist); dist = NULL;
+//				free(adjusted); adjusted = NULL;
+//				//	printf("\n likesum: %f nonInf: %f", likeliSum, nonInf);
+//
+//				if (likeliSum == 0){
+//					for (int meow = 0; meow < scaler; meow++){
+//						likeli1[meow] = likeli1[meow] / nonInf;
+//						lval1[meow + localoffset] = likeli1[meow];
+//
+//					}
+//
+//				}
+//				else{
+//					for (int meow = 0; meow < scaler; meow++){
+//						likeli1[meow] = infFlag[meow] / likeliSum;
+//						lval1[meow + localoffset] = likeli1[meow];
+//					}
+//				}
+//
+//				free(likeli1); likeli1 = NULL;
+//				free(infFlag); infFlag = NULL;
+//				outq = NULL;
+//			}
+//
 			if (permNum == 0)
 			{
 				first_lval1 = (double *)malloc(sizeof(double) * scaler * 2);
