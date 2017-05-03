@@ -878,7 +878,65 @@ void count_edges(int *dsrchAry, cudaEvent_t PN_start, cudaEvent_t PN_stop, float
 }
 
 
+void build_graph(int scalerSum, int noNodes, int c, int *dedgesPN, int *dout23, int *dpNodes, int numEdges, int *dsrchAry, int *dpEdges, int MAX_PARENTS, int *pNodes, int *pEdges, int nodeSize, int edgeSize)
+{
+	run22 << <scalerSum, noNodes >> >(c, dedgesPN, dout23, dpNodes, noNodes, numEdges, dsrchAry, dpEdges, MAX_PARENTS);
+	//printf("run22 finished\n");
 
+	HANDLE_ERROR(cudaMemcpy(pNodes, dpNodes, nodeSize, cudaMemcpyDeviceToHost));
+	HANDLE_ERROR(cudaMemcpy(pEdges, dpEdges, edgeSize, cudaMemcpyDeviceToHost));
+
+	/*for (int i = 0; i < nodeSize / sizeof(int); i++)
+	{
+		if (i > edgeSize / sizeof(int))
+		{
+			printf("nodes[%d] : %d\n", i, pNodes[i]);
+		}
+		else
+		{
+			printf("nodes[%d] : %d edges[%d] : %d\n", i, pNodes[i], i, pEdges[i]);
+		}
+	}*/
+	/*if (permNum == 0)
+	{
+				
+		for (int i = 0; i < noNodes; i++)
+		{
+			printf("pNodes[%d] : %d\n", i, pNodes[i]);
+		}
+		for (int i = 11 * noNodes; i < (11 * noNodes) + noNodes; i++)
+		{
+			printf("pNodes[%d] : %d\n", i, pNodes[i]);
+		}
+	}*/
+			
+
+	//ensure parent limit
+	checkParentLimit(scalerSum, noNodes, MAX_PARENTS, pNodes, nodeSize / sizeof(int));
+	/*for (int i = 0; i < nodeSize / sizeof(int); i++)
+	{
+		if (i > edgeSize / sizeof(int))
+		{
+			printf("pNodes[%d] : %d\n", i, pNodes[i]);
+		}
+		else
+		{
+			printf("pNodes[%d] : %d\t pEdges[%d] : %d\n", i, pNodes[i], i, pEdges[i]);
+		}
+	}*/
+	/*FILE *outputFile = fopen("NodesEdges2.txt", "w");
+	for(int i = 0; i < nodeSize / sizeof(int); i++)
+	{
+		fprintf(outputFile, "pNodes[%d] : %d\n", i, pNodes[i]);
+	}
+	for(int i = 0; i < edgeSize / sizeof(int); i++)
+	{
+		fprintf(outputFile, "pEdges[%d] : %d\n", i, pEdges[i]);
+	}
+	fclose(outputFile); */
+	//printf("%d\n", numEdges);
+
+}
 
 
 
@@ -919,6 +977,7 @@ int main(int argc, char *argv[])
 		
 
 	}
+	printf("This is the updated modular version");
 
 	int startT = getMilliCount();
 	//int start1 = getMilliCount();
@@ -1780,63 +1839,64 @@ int main(int argc, char *argv[])
 			//	fprintf(edgePNFile, "edgesPN[%d] : %d\n", i, edgesPN[i]);
 			//}
 			//fclose(edgePNFile);
-			run22 << <scalerSum, noNodes >> >(c, dedgesPN, dout23, dpNodes, noNodes, numEdges, dsrchAry, dpEdges, MAX_PARENTS);
-			//printf("run22 finished\n");
+			build_graph(scalerSum, noNodes, c, dedgesPN, dout23, dpNodes, numEdges, dsrchAry, dpEdges, MAX_PARENTS, pNodes, pEdges, nodeSize, edgeSize);
+			//run22 << <scalerSum, noNodes >> >(c, dedgesPN, dout23, dpNodes, noNodes, numEdges, dsrchAry, dpEdges, MAX_PARENTS);
+			////printf("run22 finished\n");
 
-			HANDLE_ERROR(cudaMemcpy(pNodes, dpNodes, nodeSize, cudaMemcpyDeviceToHost));
-			HANDLE_ERROR(cudaMemcpy(pEdges, dpEdges, edgeSize, cudaMemcpyDeviceToHost));
+			//HANDLE_ERROR(cudaMemcpy(pNodes, dpNodes, nodeSize, cudaMemcpyDeviceToHost));
+			//HANDLE_ERROR(cudaMemcpy(pEdges, dpEdges, edgeSize, cudaMemcpyDeviceToHost));
 
-			/*for (int i = 0; i < nodeSize / sizeof(int); i++)
-			{
-				if (i > edgeSize / sizeof(int))
-				{
-					printf("nodes[%d] : %d\n", i, pNodes[i]);
-				}
-				else
-				{
-					printf("nodes[%d] : %d edges[%d] : %d\n", i, pNodes[i], i, pEdges[i]);
-				}
-			}*/
+			///*for (int i = 0; i < nodeSize / sizeof(int); i++)
+			//{
+			//	if (i > edgeSize / sizeof(int))
+			//	{
+			//		printf("nodes[%d] : %d\n", i, pNodes[i]);
+			//	}
+			//	else
+			//	{
+			//		printf("nodes[%d] : %d edges[%d] : %d\n", i, pNodes[i], i, pEdges[i]);
+			//	}
+			//}*/
 
-			/*if (permNum == 0)
-			{
-				
-				for (int i = 0; i < noNodes; i++)
-				{
-					printf("pNodes[%d] : %d\n", i, pNodes[i]);
-				}
-				for (int i = 11 * noNodes; i < (11 * noNodes) + noNodes; i++)
-				{
-					printf("pNodes[%d] : %d\n", i, pNodes[i]);
-				}
-			}*/
-			
+			///*if (permNum == 0)
+			//{
+			//	
+			//	for (int i = 0; i < noNodes; i++)
+			//	{
+			//		printf("pNodes[%d] : %d\n", i, pNodes[i]);
+			//	}
+			//	for (int i = 11 * noNodes; i < (11 * noNodes) + noNodes; i++)
+			//	{
+			//		printf("pNodes[%d] : %d\n", i, pNodes[i]);
+			//	}
+			//}*/
+			//
 
-			//ensure parent limit
-			checkParentLimit(scalerSum, noNodes, MAX_PARENTS, pNodes, nodeSize / sizeof(int));
-			/*for (int i = 0; i < nodeSize / sizeof(int); i++)
-			{
-				if (i > edgeSize / sizeof(int))
-				{
-					printf("pNodes[%d] : %d\n", i, pNodes[i]);
-				}
-				else
-				{
-					printf("pNodes[%d] : %d\t pEdges[%d] : %d\n", i, pNodes[i], i, pEdges[i]);
-				}
-			}*/
-			/*FILE *outputFile = fopen("NodesEdges2.txt", "w");
-			for(int i = 0; i < nodeSize / sizeof(int); i++)
-			{
-				fprintf(outputFile, "pNodes[%d] : %d\n", i, pNodes[i]);
-			}
-			for(int i = 0; i < edgeSize / sizeof(int); i++)
-			{
-				fprintf(outputFile, "pEdges[%d] : %d\n", i, pEdges[i]);
-			}
+			////ensure parent limit
+			//checkParentLimit(scalerSum, noNodes, MAX_PARENTS, pNodes, nodeSize / sizeof(int));
+			///*for (int i = 0; i < nodeSize / sizeof(int); i++)
+			//{
+			//	if (i > edgeSize / sizeof(int))
+			//	{
+			//		printf("pNodes[%d] : %d\n", i, pNodes[i]);
+			//	}
+			//	else
+			//	{
+			//		printf("pNodes[%d] : %d\t pEdges[%d] : %d\n", i, pNodes[i], i, pEdges[i]);
+			//	}
+			//}*/
+			///*FILE *outputFile = fopen("NodesEdges2.txt", "w");
+			//for(int i = 0; i < nodeSize / sizeof(int); i++)
+			//{
+			//	fprintf(outputFile, "pNodes[%d] : %d\n", i, pNodes[i]);
+			//}
+			//for(int i = 0; i < edgeSize / sizeof(int); i++)
+			//{
+			//	fprintf(outputFile, "pEdges[%d] : %d\n", i, pEdges[i]);
+			//}
 
-			fclose(outputFile); */
-			//printf("%d\n", numEdges);
+			//fclose(outputFile); */
+			////printf("%d\n", numEdges);
 			
 			HANDLE_ERROR(cudaFree(dsrchAry)); dsrchAry = NULL;
 			HANDLE_ERROR(cudaFree(dout23)); dout23 = NULL;
