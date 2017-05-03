@@ -830,6 +830,54 @@ int calculate_edges(int scalerSum, int samples, int samples2, int genesetlength,
 }
 
 
+void count_edges(int *dsrchAry, cudaEvent_t PN_start, cudaEvent_t PN_stop, float PN_time, int *dout23, int *dedgesPN, int genes, int MAX_PARENTS, int c, int scalerSum, int *edgesPN, cudaError_t errSync, int sampleSum)
+{
+
+	int *tempEdgesSums;
+	tempEdgesSums = (int *) calloc(sampleSum + 1, sizeof(int));
+	//edgePerNetworkKernel << < sampleSum + 1, c, (c * sizeof(int)) >> >(dout23, dedgesPN, dsrchAry, genes, MAX_PARENTS, c);
+	edgePerNetworkKernel << < sampleSum + 1, 1 >> > (dout23, dedgesPN, dsrchAry, genes, MAX_PARENTS, c);
+	//printf("edgesPerNetworkKernel finished\n");
+	cudaEventRecord(PN_stop, 0);
+	//HANDLE_ERROR(cudaMemcpy(edgesPN, dedgesPN, sizeof(int) * (scalerSum + 1), cudaMemcpyDeviceToHost));
+			
+	//copy edge sums over to CPU to calculate prefix sum for edgesPN	
+	HANDLE_ERROR(cudaMemcpy(tempEdgesSums, dedgesPN, sizeof(int) * (scalerSum + 1), cudaMemcpyDeviceToHost));	
+			
+	edgesPN[0] = 0;
+	for(int i = 1; i < sampleSum + 1; i++)
+	{
+		edgesPN[i] = edgesPN[i-1] + tempEdgesSums[i-1]; //prefix sum calculation
+	}
+	//get rid of this temp array	
+	free(tempEdgesSums); tempEdgesSums = NULL;
+	//edgesPN on the CPU is now fixed but dedgesPN is used later- copy edgesPN results back to GPU memory
+	HANDLE_ERROR(cudaMemcpy(dedgesPN, edgesPN, sizeof(int) * (sampleSum + 1), cudaMemcpyHostToDevice));
+			
+	/*
+	for (int i = 0; i < scalerSum + 1; i++)
+	{
+	printf("edgesPN[%d] : %d\n", i, edgesPN[i]);
+	}	
+	*/
+	//exit(EXIT_FAILURE);
+			
+	errSync = cudaGetLastError();
+	if (errSync != cudaSuccess)
+	{
+		printf("%s\n", cudaGetErrorString(errSync));
+	}
+	/*for (int i = 0; i < scalerSum + 1; i++)
+	{
+	printf("edgesPN[%d] : %d\n", i, edgesPN[i]);
+	}*/
+	//cudaEventRecord(PN_stop, 0);
+	cudaEventSynchronize(PN_stop);
+	cudaEventElapsedTime(&PN_time, PN_start, PN_stop);
+
+}
+
+
 
 
 
@@ -1635,10 +1683,10 @@ int main(int argc, char *argv[])
 
 
 			//device copy
-			int *dsrchAry, *tempEdgesSums;
+			int *dsrchAry;//, *tempEdgesSums;
 			HANDLE_ERROR(cudaMalloc((void **)&dsrchAry, genes * sizeof(int)));
 			HANDLE_ERROR(cudaMemcpy(dsrchAry, searcher, genes * sizeof(int), cudaMemcpyHostToDevice));
-			tempEdgesSums = (int *)calloc(sampleSum + 1, sizeof(int));
+			//tempEdgesSums = (int *)calloc(sampleSum + 1, sizeof(int));
 
 			free(searcher); searcher = NULL;
 
@@ -1648,46 +1696,47 @@ int main(int argc, char *argv[])
 			cudaEventRecord(PN_start, 0);
 			float PN_time;
 
-			//edgePerNetworkKernel << < sampleSum + 1, c, (c * sizeof(int)) >> >(dout23, dedgesPN, dsrchAry, genes, MAX_PARENTS, c);
-			edgePerNetworkKernel << < sampleSum + 1, 1 >> > (dout23, dedgesPN, dsrchAry, genes, MAX_PARENTS, c);
-			//printf("edgesPerNetworkKernel finished\n");
-			cudaEventRecord(PN_stop, 0);
-			//HANDLE_ERROR(cudaMemcpy(edgesPN, dedgesPN, sizeof(int) * (scalerSum + 1), cudaMemcpyDeviceToHost));
-			
-			//copy edge sums over to CPU to calculate prefix sum for edgesPN	
-			HANDLE_ERROR(cudaMemcpy(tempEdgesSums, dedgesPN, sizeof(int) * (scalerSum + 1), cudaMemcpyDeviceToHost));	
-			
-			edgesPN[0] = 0;
-			for(int i = 1; i < sampleSum + 1; i++)
-			{
-				edgesPN[i] = edgesPN[i-1] + tempEdgesSums[i-1]; //prefix sum calculation
-			}
-			//get rid of this temp array	
-			free(tempEdgesSums); tempEdgesSums = NULL;
-			//edgesPN on the CPU is now fixed but dedgesPN is used later- copy edgesPN results back to GPU memory
-			HANDLE_ERROR(cudaMemcpy(dedgesPN, edgesPN, sizeof(int) * (sampleSum + 1), cudaMemcpyHostToDevice));
-			
-			/*
-			for (int i = 0; i < scalerSum + 1; i++)
-			{
-			printf("edgesPN[%d] : %d\n", i, edgesPN[i]);
-			}	
-			*/
-			//exit(EXIT_FAILURE);
-			
-			errSync = cudaGetLastError();
-			if (errSync != cudaSuccess)
-			{
-				printf("%s\n", cudaGetErrorString(errSync));
-			}
-
-			/*for (int i = 0; i < scalerSum + 1; i++)
-			{
-			printf("edgesPN[%d] : %d\n", i, edgesPN[i]);
-			}*/
+			count_edges(dsrchAry, PN_start, PN_stop, PN_time, dout23, dedgesPN, genes, MAX_PARENTS, c, scalerSum, edgesPN, errSync, sampleSum);
+			////edgePerNetworkKernel << < sampleSum + 1, c, (c * sizeof(int)) >> >(dout23, dedgesPN, dsrchAry, genes, MAX_PARENTS, c);
+			//edgePerNetworkKernel << < sampleSum + 1, 1 >> > (dout23, dedgesPN, dsrchAry, genes, MAX_PARENTS, c);
+			////printf("edgesPerNetworkKernel finished\n");
 			//cudaEventRecord(PN_stop, 0);
-			cudaEventSynchronize(PN_stop);
-			cudaEventElapsedTime(&PN_time, PN_start, PN_stop);
+			////HANDLE_ERROR(cudaMemcpy(edgesPN, dedgesPN, sizeof(int) * (scalerSum + 1), cudaMemcpyDeviceToHost));
+			//
+			////copy edge sums over to CPU to calculate prefix sum for edgesPN	
+			//HANDLE_ERROR(cudaMemcpy(tempEdgesSums, dedgesPN, sizeof(int) * (scalerSum + 1), cudaMemcpyDeviceToHost));	
+			//
+			//edgesPN[0] = 0;
+			//for(int i = 1; i < sampleSum + 1; i++)
+			//{
+			//	edgesPN[i] = edgesPN[i-1] + tempEdgesSums[i-1]; //prefix sum calculation
+			//}
+			////get rid of this temp array	
+			//free(tempEdgesSums); tempEdgesSums = NULL;
+			////edgesPN on the CPU is now fixed but dedgesPN is used later- copy edgesPN results back to GPU memory
+			//HANDLE_ERROR(cudaMemcpy(dedgesPN, edgesPN, sizeof(int) * (sampleSum + 1), cudaMemcpyHostToDevice));
+			//
+			///*
+			//for (int i = 0; i < scalerSum + 1; i++)
+			//{
+			//printf("edgesPN[%d] : %d\n", i, edgesPN[i]);
+			//}	
+			//*/
+			////exit(EXIT_FAILURE);
+			//
+			//errSync = cudaGetLastError();
+			//if (errSync != cudaSuccess)
+			//{
+			//	printf("%s\n", cudaGetErrorString(errSync));
+			//}
+
+			///*for (int i = 0; i < scalerSum + 1; i++)
+			//{
+			//printf("edgesPN[%d] : %d\n", i, edgesPN[i]);
+			//}*/
+			////cudaEventRecord(PN_stop, 0);
+			//cudaEventSynchronize(PN_stop);
+			//cudaEventElapsedTime(&PN_time, PN_start, PN_stop);
 			//printf("edgesPerNetworkKernel time : %f\n", PN_time);
 			//cudaFree(d_ones); 
 			HANDLE_ERROR(cudaFree(dpriorMatrix)); dpriorMatrix = NULL;
