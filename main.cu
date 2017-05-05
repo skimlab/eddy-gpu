@@ -224,42 +224,6 @@ double gammds(double x, double p, int *ifault)
 
 
 
-
-//the following two routines are used to benchmark time of execution 
-int getMilliCount(){
-	timeb tb;
-	ftime(&tb);
-	int nCount = tb.millitm + (tb.time & 0xfffff) * 1000;
-	return nCount;
-}
-
-int getMilliSpan(int nTimeStart){
-	int nSpan = getMilliCount() - nTimeStart;
-	if (nSpan < 0)
-		nSpan += 0x100000 * 1000;
-	return nSpan;
-}
-
-__host__ int arrayEqual(double *a, double *b, int size)
-{
-	int flag = 1;
-	for (int i = 0; i < size; i++)
-	{
-		if (!(a[i] == b[i]))
-		{
-			flag = 0;
-			return flag;
-		}
-	}
-
-	return flag;
-}
-
-
-
-
-
-
 __host__ int cmpfunc(const void * a, const void * b)
 {
 	return (*(int*)a - *(int*)b);
@@ -469,16 +433,6 @@ __host__ void writeEdgeListFile(char *outputFile, char *inputName, char *classNa
 	int *eddyFound = (int *)calloc(genesetlength * genesetlength, sizeof(int));
 	
 
-	//printf("Print contents of class1: \n");
-	//for(int i = 0; i < class1Nodes.size(); i++)
-	//{
-	//	printf("%s\t%s\t in Both: %d\n", genesetgenes[class1Nodes.at(i).node], genesetgenes[class1Nodes.at(i).edge], class1Nodes.at(i).inBoth);
-	//}
-	//printf("\nPrint contents of class2 : \n");
-	//for(int i = 0; i < class2Nodes.size(); i++)
-	//{
-	//	printf("%s\t%s\t in Both: %d\n", genesetgenes[class2Nodes.at(i).node], genesetgenes[class2Nodes.at(i).edge], class2Nodes.at(i).inBoth);
-	//}
 
 
 	
@@ -578,6 +532,7 @@ __host__ void checkParentLimit(int numNetworks, int numNodes, int maxParents, in
 	}
 }
 
+//compute likelihood of different dataset parsed by 2 iterations
 __host__ void compute_likelihood(int scaler, int noNodes, double *out5, double *lval1)
 {
 	for(int g = 0; g < 2; g++){
@@ -691,20 +646,10 @@ __host__ void compute_likelihood(int scaler, int noNodes, double *out5, double *
 
 }
 
+//determine gene relationships by running expression data through chi-squared test
+//@RETURN: sampleSum - total number of samples 
 int calculate_edges(int scalerSum, int samples, int samples2, int genesetlength, int size2, int c, int genes, int *transferdata1, int *transferdata2, int *ff1, int *priorMatrix, int *spacer1, cudaEvent_t start, cudaEvent_t stop, float time, double pw, int *edgeListData1, int *edgeListData2, int *dout23, int *dedgesPN, int *dtriA, int *dtriAb, int *ddofout, int *dppn, int *dstf, int *dff, int *dspacr, int *dpriorMatrix, int numclass1, int numclass2, int permNum)
 {
-	////space alloc for device
-	//HANDLE_ERROR(cudaMalloc((void **)&dtriA, genesetlength*samples*sizeof(int)));
-	//HANDLE_ERROR(cudaMalloc((void **)&dtriAb, genesetlength*samples2*sizeof(int)));
-	//HANDLE_ERROR(cudaMalloc((void **)&dppn, genesetlength * 2 * sizeof(int)));
-	//HANDLE_ERROR(cudaMalloc((void **)&dstf, genesetlength * 2 * 3 * sizeof(int)));
-	//HANDLE_ERROR(cudaMalloc((void **)&ddofout, size2));
-	//HANDLE_ERROR(cudaMalloc((void **)&dff, c*sizeof(int)));
-	//HANDLE_ERROR(cudaMalloc((void **)&dspacr, c*sizeof(int)));
-	////cudaMalloc((void **)&d_ones, onesSize);
-	//HANDLE_ERROR(cudaMalloc((void **)&dout23, sizeof(int) * c * scalerSum));
-	//HANDLE_ERROR(cudaMalloc((void **)&dedgesPN, sizeof(int) * (scalerSum + 1)));
-	//HANDLE_ERROR(cudaMalloc((void **)&dpriorMatrix, sizeof(int) * genesetlength * genesetlength));
 			
 
 	//copy into device 
@@ -722,23 +667,10 @@ int calculate_edges(int scalerSum, int samples, int samples2, int genesetlength,
 	free(spacer1); spacer1 = NULL;
 	free(ff1); ff1 = NULL;
 
-	//deploy
-	//int milliSecondsElapsed1 = getMilliSpan(start1);
-	//int start2 = getMilliCount();
 	int sampleSum = samples + samples2 + 2;
-	//printf("samples : %d\n", samples);
 
 			
-			
-	//run no states in separate kernel to avoid threading
-	//noStates_kernel <<<genes * 2, 1 >>>(genes, samples, samples2, dtriA, dtriAb, dppn, dstf);
-
-
-
-
-
 	cudaEventRecord(start, 0);
-	//printf("c = %d\n", c);
 	if( c < MAX_THREADS)
 	{
 	run2 << <sampleSum, c, genes * genes * sizeof(int) >> >(genes, samples, samples2, dtriA, dtriAb, dspacr, dff, ddofout, dppn, dstf, dout23, c, dpriorMatrix, pw);
@@ -748,36 +680,14 @@ int calculate_edges(int scalerSum, int samples, int samples2, int genesetlength,
 		int BPN = ceil((c * 1.0) / MAX_THREADS);
 		int TPB = ceil((c * 1.0) / BPN);
 			
-		//printf("launching with %d blocks per network and %d threads per block\n", BPN, TPB);
 		run2Scalable <<< sampleSum * BPN, TPB>>>(genes, samples, samples2, dtriA, dtriAb,dspacr, dff, ddofout, dppn, dstf, dout23, c, dpriorMatrix, pw, BPN, TPB);
-		//printf("run2Scalable completed\n");
 	}
 
 
-	//test ppn/stf
-	/*int *tempPpn = (int *)malloc(sizeof(int) * 2 * genesetlength);
-	int *tempStf = (int *)malloc(sizeof(int) * 2 * 3 * genesetlength);
-	cudaMemcpy(tempPpn, dppn, sizeof(int) * 2 * genesetlength, cudaMemcpyDeviceToHost);
-	cudaMemcpy(tempStf, dstf, sizeof(int) * 2 * 3 * genesetlength, cudaMemcpyDeviceToHost);
-	for (int i = 0; i < 2 * genesetlength; i++)
-	{
-		printf("ppn[%d] : %d\n", i, tempPpn[i]);
-	}
-	for (int i = 0; i < 2 * 3 * genesetlength; i++)
-	{
-		printf("stf[%d] : %d\n", i, tempStf[i]);
-	}*/
 
-	//printf("run2 finished\n");
-	//cudaError_t errSync = cudaGetLastError();
-	//if (errSync != cudaSuccess)
-	//{
-	//	printf("%s\n", cudaGetErrorString(errSync));
-	//}
 	cudaEventRecord(stop, 0);
 	cudaEventSynchronize(stop);
 	cudaEventElapsedTime(&time, start, stop);
-	//printf("Run 2 Time : %f\n", time);
 
 	if (permNum == 0)
 	{
@@ -808,38 +718,23 @@ int calculate_edges(int scalerSum, int samples, int samples2, int genesetlength,
 			
 
 
-		////copy data for the first network in the first class
-		//int *ptr1 = &tempOut23[0];
-		//memcpy(edgeListData1, ptr1, sizeof(int) * c);
-		////copy data for the first network in the second class
-		//printf("2nd memcpy starting point : %d\n", scaler * c);
-		////int *ptr2 = &tempOut23[scaler * c];
-		//int *ptr2 = &tempOut23[(scaler) * c];
-		//memcpy(edgeListData2, ptr2, sizeof(int) * c);
-		//ptr1 = NULL;
-		//ptr2 = NULL;
 
 		free(tempOut23); tempOut23 = NULL;
 	}
 
 
 
-	//int milliSecondsElapsed2 = getMilliSpan(start2);
-	//int start3 = getMilliCount();
 	return sampleSum;
 }
 
-
+//build edgesPN array that holds the number of edges for each network
 void count_edges(int *dsrchAry, cudaEvent_t PN_start, cudaEvent_t PN_stop, float PN_time, int *dout23, int *dedgesPN, int genes, int MAX_PARENTS, int c, int scalerSum, int *edgesPN, cudaError_t errSync, int sampleSum)
 {
 
 	int *tempEdgesSums;
 	tempEdgesSums = (int *) calloc(sampleSum + 1, sizeof(int));
-	//edgePerNetworkKernel << < sampleSum + 1, c, (c * sizeof(int)) >> >(dout23, dedgesPN, dsrchAry, genes, MAX_PARENTS, c);
 	edgePerNetworkKernel << < sampleSum + 1, 1 >> > (dout23, dedgesPN, dsrchAry, genes, MAX_PARENTS, c);
-	//printf("edgesPerNetworkKernel finished\n");
 	cudaEventRecord(PN_stop, 0);
-	//HANDLE_ERROR(cudaMemcpy(edgesPN, dedgesPN, sizeof(int) * (scalerSum + 1), cudaMemcpyDeviceToHost));
 			
 	//copy edge sums over to CPU to calculate prefix sum for edgesPN	
 	HANDLE_ERROR(cudaMemcpy(tempEdgesSums, dedgesPN, sizeof(int) * (scalerSum + 1), cudaMemcpyDeviceToHost));	
@@ -854,117 +749,50 @@ void count_edges(int *dsrchAry, cudaEvent_t PN_start, cudaEvent_t PN_stop, float
 	//edgesPN on the CPU is now fixed but dedgesPN is used later- copy edgesPN results back to GPU memory
 	HANDLE_ERROR(cudaMemcpy(dedgesPN, edgesPN, sizeof(int) * (sampleSum + 1), cudaMemcpyHostToDevice));
 			
-	/*
-	for (int i = 0; i < scalerSum + 1; i++)
-	{
-	printf("edgesPN[%d] : %d\n", i, edgesPN[i]);
-	}	
-	*/
-	//exit(EXIT_FAILURE);
 			
 	errSync = cudaGetLastError();
 	if (errSync != cudaSuccess)
 	{
 		printf("%s\n", cudaGetErrorString(errSync));
 	}
-	/*for (int i = 0; i < scalerSum + 1; i++)
-	{
-	printf("edgesPN[%d] : %d\n", i, edgesPN[i]);
-	}*/
-	//cudaEventRecord(PN_stop, 0);
 	cudaEventSynchronize(PN_stop);
 	cudaEventElapsedTime(&PN_time, PN_start, PN_stop);
 
 }
 
-
+//construct network graphs from gene relationships and network edge counts (edgesPN).
 void build_graph(int scalerSum, int noNodes, int c, int *dedgesPN, int *dout23, int *dpNodes, int numEdges, int *dsrchAry, int *dpEdges, int MAX_PARENTS, int *pNodes, int *pEdges, int nodeSize, int edgeSize)
 {
 	run22 << <scalerSum, noNodes >> >(c, dedgesPN, dout23, dpNodes, noNodes, numEdges, dsrchAry, dpEdges, MAX_PARENTS);
-	//printf("run22 finished\n");
 
 	HANDLE_ERROR(cudaMemcpy(pNodes, dpNodes, nodeSize, cudaMemcpyDeviceToHost));
 	HANDLE_ERROR(cudaMemcpy(pEdges, dpEdges, edgeSize, cudaMemcpyDeviceToHost));
 
-	/*for (int i = 0; i < nodeSize / sizeof(int); i++)
-	{
-		if (i > edgeSize / sizeof(int))
-		{
-			printf("nodes[%d] : %d\n", i, pNodes[i]);
-		}
-		else
-		{
-			printf("nodes[%d] : %d edges[%d] : %d\n", i, pNodes[i], i, pEdges[i]);
-		}
-	}*/
-	/*if (permNum == 0)
-	{
-				
-		for (int i = 0; i < noNodes; i++)
-		{
-			printf("pNodes[%d] : %d\n", i, pNodes[i]);
-		}
-		for (int i = 11 * noNodes; i < (11 * noNodes) + noNodes; i++)
-		{
-			printf("pNodes[%d] : %d\n", i, pNodes[i]);
-		}
-	}*/
 			
 
 	//ensure parent limit
 	checkParentLimit(scalerSum, noNodes, MAX_PARENTS, pNodes, nodeSize / sizeof(int));
-	/*for (int i = 0; i < nodeSize / sizeof(int); i++)
-	{
-		if (i > edgeSize / sizeof(int))
-		{
-			printf("pNodes[%d] : %d\n", i, pNodes[i]);
-		}
-		else
-		{
-			printf("pNodes[%d] : %d\t pEdges[%d] : %d\n", i, pNodes[i], i, pEdges[i]);
-		}
-	}*/
-	/*FILE *outputFile = fopen("NodesEdges2.txt", "w");
-	for(int i = 0; i < nodeSize / sizeof(int); i++)
-	{
-		fprintf(outputFile, "pNodes[%d] : %d\n", i, pNodes[i]);
-	}
-	for(int i = 0; i < edgeSize / sizeof(int); i++)
-	{
-		fprintf(outputFile, "pEdges[%d] : %d\n", i, pEdges[i]);
-	}
-	fclose(outputFile); */
-	//printf("%d\n", numEdges);
 
 }
 
 
 
 
-
+//determine which graphs are duplicated and mark them for removal in structureUnique
 void mark_duplicate_networks(int scalerSum, int scalerCombo, int *scalerTest, int *shrunkPlc, int *shrunk, int *dshrunk, int *dscalerTest, int *dshnkplc, int maxThreads, int samples, int numEdges, int genesetlength, int *dedgesPN, int *dpNodes, int *dpEdges)
 {
 
 	idPrep(scalerSum, scalerCombo, scalerTest, shrunkPlc);
 
-	//dev copies
-	//launch for run 25 *****************************************************************************************
 	
 
 	//cp into device
 	HANDLE_ERROR(cudaMemcpy(dscalerTest, scalerTest, sizeof(int)*scalerCombo, cudaMemcpyHostToDevice));
 	HANDLE_ERROR(cudaMemcpy(dshnkplc, shrunkPlc, sizeof(int)*scalerCombo, cudaMemcpyHostToDevice));
-	//************************************************************************************************
-	//(int scaler,int noEdges, int gLength,int scalerCombo, int *dedgesPN, int  *dNodes, int *dedgeAry, int *shrunk)
-	// 
 
-	//printf("%/ max: %d   ", maxBlocks*maxThreads);
-	//printf("\n");
 	run25 << <(scalerCombo / (maxThreads - 1)) + 1, maxThreads - 1 >> >(samples + 1, scalerSum, numEdges, genesetlength, scalerCombo, dedgesPN, dpNodes, dpEdges, dshrunk, dscalerTest, dshnkplc);
-	//printf("run25 finished\n");
-	//*********************************************************************************************
+	
 	HANDLE_ERROR(cudaMemcpy(shrunk, dshrunk, sizeof(int)*scalerCombo, cudaMemcpyDeviceToHost));
-	//*************************test****************************************
 	cudaFree(dshrunk); dshrunk = NULL;
 	cudaFree(dscalerTest); dscalerTest = NULL;
 	cudaFree(dshnkplc); dshnkplc = NULL;
@@ -975,17 +803,15 @@ void mark_duplicate_networks(int scalerSum, int scalerCombo, int *scalerTest, in
 
 
 }
-
+//calculate the BDEU scores for each graph
 void score_networks(double *out5, double *dout5, int *dpEdges2, int *dpNodes2, int *dNij, int *dNijk, int *dUniEpn, int uniEdgeSize, int uniNodeSize, int unisum, int noNodes, int scaler, int *pUniEdges, int *pUniNodes, int *pUniEpn, int genesetlength, int edSum, int samples, int samples2, int *dtriA, int *dtriAb, int *dppn, int *dstf, int dppnLength)
 {
 
 
-//cp to devp'4
 	
 
 	HANDLE_ERROR(cudaMemcpy(dpEdges2, pUniEdges, uniEdgeSize, cudaMemcpyHostToDevice));
 	HANDLE_ERROR(cudaMemcpy(dpNodes2, pUniNodes, uniNodeSize, cudaMemcpyHostToDevice));
-	//HANDLE_ERROR(cudaMemcpy(dUniEpn, pUniEpn, sizeof(int)*uniEpnSize, cudaMemcpyHostToDevice));
 	HANDLE_ERROR(cudaMemcpy(dUniEpn, pUniEpn, sizeof(int) * unisum, cudaMemcpyHostToDevice));
 	free(pUniNodes); pUniNodes = NULL;
 	free(pUniEdges); pUniEdges = NULL;
@@ -998,11 +824,10 @@ void score_networks(double *out5, double *dout5, int *dpEdges2, int *dpNodes2, i
 	float run4Time;
 
 	run4 << <scaler * 2, noNodes >> >(scaler, dUniEpn, genesetlength, edSum, unisum, samples, samples2, dtriA, dtriAb, dpEdges2, dpNodes2, dppn, dstf, dNij, dNijk, dout5, dppnLength);
-	//printf("run 4 finished\n");
+	
 	cudaEventRecord(run4End, 0);
 	cudaEventSynchronize(run4End);
 	cudaEventElapsedTime(&run4Time, run4Start, run4End);
-	//printf("run 4 time : %f\n", run4Time);
 	HANDLE_ERROR(cudaMemcpy(out5, dout5, sizeof(double)*noNodes*scaler * 2, cudaMemcpyDeviceToHost));
 
 
@@ -1045,10 +870,7 @@ int main(int argc, char *argv[])
 		
 
 	}
-	printf("This is the updated modular version with run4 module");
 
-	int startT = getMilliCount();
-	//int start1 = getMilliCount();
 	//data grab routine *************************************************************************************
 	//command line arguments parser--------------------------------------------------------------------------
 
@@ -1664,148 +1486,15 @@ int main(int argc, char *argv[])
         		HANDLE_ERROR(cudaMalloc((void **)&ddofout, size2));
         		HANDLE_ERROR(cudaMalloc((void **)&dff, c*sizeof(int)));
         		HANDLE_ERROR(cudaMalloc((void **)&dspacr, c*sizeof(int)));
-        		//cudaMalloc((void **)&d_ones, onesSize);
         		HANDLE_ERROR(cudaMalloc((void **)&dout23, sizeof(int) * c * scalerSum));
         		HANDLE_ERROR(cudaMalloc((void **)&dedgesPN, sizeof(int) * (scalerSum + 1)));
         		HANDLE_ERROR(cudaMalloc((void **)&dpriorMatrix, sizeof(int) * genesetlength * genesetlength));			
 			int dppnLength = genesetlength * 2;
 			int sampleSum = calculate_edges(scalerSum, samples, samples2, genesetlength, size2, c, genes, transferdata1, transferdata2, ff1, priorMatrix, spacer1, start, stop, time, pw, edgeListData1, edgeListData2, dout23, dedgesPN, dtriA, dtriAb, ddofout, dppn, dstf, dff, dspacr, dpriorMatrix, numclass1, numclass2, permNum);
 			cudaError_t errSync = cudaGetLastError();
-			//int dppnLength = genesetlength * 2;
-			//////space alloc for device
-			//HANDLE_ERROR(cudaMalloc((void **)&dtriA, genesetlength*samples*sizeof(int)));
-			//HANDLE_ERROR(cudaMalloc((void **)&dtriAb, genesetlength*samples2*sizeof(int)));
-			//HANDLE_ERROR(cudaMalloc((void **)&dppn, genesetlength * 2 * sizeof(int)));
-			//HANDLE_ERROR(cudaMalloc((void **)&dstf, genesetlength * 2 * 3 * sizeof(int)));
-			//HANDLE_ERROR(cudaMalloc((void **)&ddofout, size2));
-			//HANDLE_ERROR(cudaMalloc((void **)&dff, c*sizeof(int)));
-			//HANDLE_ERROR(cudaMalloc((void **)&dspacr, c*sizeof(int)));
-			////cudaMalloc((void **)&d_ones, onesSize);
-			//HANDLE_ERROR(cudaMalloc((void **)&dout23, sizeof(int) * c * scalerSum));
-			//HANDLE_ERROR(cudaMalloc((void **)&dedgesPN, sizeof(int) * (scalerSum + 1)));
-
-			//HANDLE_ERROR(cudaMalloc((void **)&dpriorMatrix, sizeof(int) * genesetlength * genesetlength));
-			//
-
-			////copy into device 
-			//assert(genes*samples*sizeof(int) == genesetlength * numclass1 * sizeof(int));
-			//assert(genes*samples2*sizeof(int) == genesetlength * numclass2 * sizeof(int));
-			//HANDLE_ERROR(cudaMemcpy(dtriA, transferdata1, genes*samples*sizeof(int), cudaMemcpyHostToDevice));
-			//HANDLE_ERROR(cudaMemcpy(dtriAb, transferdata2, genes*samples2*sizeof(int), cudaMemcpyHostToDevice));
-			//HANDLE_ERROR(cudaMemcpy(dff, ff1, c*sizeof(int), cudaMemcpyHostToDevice));
-			//HANDLE_ERROR(cudaMemcpy(dspacr, spacer1, c*sizeof(int), cudaMemcpyHostToDevice));
-			//HANDLE_ERROR(cudaMemcpy(dpriorMatrix, priorMatrix, genesetlength * genesetlength * sizeof(int), cudaMemcpyHostToDevice));
-			//
-			//
-
-			////no longer used once copied to GPU
-			//free(spacer1); spacer1 = NULL;
-			//free(ff1); ff1 = NULL;
-
-			////deploy main()
-			//int milliSecondsElapsed1 = getMilliSpan(start1);
-			//int start2 = getMilliCount();
-			//int sampleSum = samples + samples2 + 2;
-			////printf("samples : %d\n", samples);
-
-			//
-			//
-			////run no states in separate kernel to avoid threading
-			////noStates_kernel <<<genes * 2, 1 >>>(genes, samples, samples2, dtriA, dtriAb, dppn, dstf);
 
 
 
-
-
-			//cudaEventRecord(start, 0);
-			////printf("c = %d\n", c);
-			//if( c < MAX_THREADS)
-			//{
-			//run2 << <sampleSum, c, genes * genes * sizeof(int) >> >(genes, samples, samples2, dtriA, dtriAb, dspacr, dff, ddofout, dppn, dstf, dout23, c, dpriorMatrix, pw);
-			//}
-			//else
-			//{
-			//	int BPN = ceil((c * 1.0) / MAX_THREADS);
-			//	int TPB = ceil((c * 1.0) / BPN);
-			//
-			//	//printf("launching with %d blocks per network and %d threads per block\n", BPN, TPB);
-			//	run2Scalable <<< sampleSum * BPN, TPB>>>(genes, samples, samples2, dtriA, dtriAb,dspacr, dff, ddofout, dppn, dstf, dout23, c, dpriorMatrix, pw, BPN, TPB);
-			//	//printf("run2Scalable completed\n");
-			//}
-
-
-			////test ppn/stf
-			///*int *tempPpn = (int *)malloc(sizeof(int) * 2 * genesetlength);
-			//int *tempStf = (int *)malloc(sizeof(int) * 2 * 3 * genesetlength);
-			//cudaMemcpy(tempPpn, dppn, sizeof(int) * 2 * genesetlength, cudaMemcpyDeviceToHost);
-			//cudaMemcpy(tempStf, dstf, sizeof(int) * 2 * 3 * genesetlength, cudaMemcpyDeviceToHost);
-			//for (int i = 0; i < 2 * genesetlength; i++)
-			//{
-			//	printf("ppn[%d] : %d\n", i, tempPpn[i]);
-			//}
-			//for (int i = 0; i < 2 * 3 * genesetlength; i++)
-			//{
-			//	printf("stf[%d] : %d\n", i, tempStf[i]);
-			//}*/
-
-			////printf("run2 finished\n");
-			//cudaError_t errSync = cudaGetLastError();
-			//if (errSync != cudaSuccess)
-			//{
-			//	printf("%s\n", cudaGetErrorString(errSync));
-			//}
-			//cudaEventRecord(stop, 0);
-			//cudaEventSynchronize(stop);
-			//cudaEventElapsedTime(&time, start, stop);
-			////printf("Run 2 Time : %f\n", time);
-
-			//if (permNum == 0)
-			//{
-			//	//holds post run2 edge data for edge list calculations after permutations
-			//	edgeListData1 = (int *)malloc(sizeof(int) * c);
-			//	edgeListData2 = (int *)malloc(sizeof(int) * c);
-
-			//	//host array to transfer output of run2 to edgeListData1/edgeListData2
-			//	int *tempOut23 = (int *)malloc(sizeof(int) * c * scalerSum);
-			//	
-
-			//	//copy binary data back to CPU
-			//	HANDLE_ERROR(cudaMemcpy(tempOut23, dout23, sizeof(int) * c * scalerSum, cudaMemcpyDeviceToHost));
-			//	
-
-			//	//first network in first class - no samples left out
-			//	for (int i = 0; i < c; i++)
-			//	{
-			//		//load 1st network from class 1
-			//		edgeListData1[i] = tempOut23[i];
-			//	}
-			//	int count = 0;
-			//	//last network in 2nd class - no samples left out
-			//	for (int i = (scalerSum - 1) * c; i < (scalerSum) * c; i++)
-			//	{
-			//		edgeListData2[count++] = tempOut23[i];
-			//	}
-			//
-
-
-			//	////copy data for the first network in the first class
-			//	//int *ptr1 = &tempOut23[0];
-			//	//memcpy(edgeListData1, ptr1, sizeof(int) * c);
-			//	////copy data for the first network in the second class
-			//	//printf("2nd memcpy starting point : %d\n", scaler * c);
-			//	////int *ptr2 = &tempOut23[scaler * c];
-			//	//int *ptr2 = &tempOut23[(scaler) * c];
-			//	//memcpy(edgeListData2, ptr2, sizeof(int) * c);
-			//	//ptr1 = NULL;
-			//	//ptr2 = NULL;
-
-			//free(tempOut23); tempOut23 = NULL;
-			//}
-
-
-
-			//int milliSecondsElapsed2 = getMilliSpan(start2);
-			//int start3 = getMilliCount();
 
 
 
@@ -1824,48 +1513,10 @@ int main(int argc, char *argv[])
 			float PN_time;
 
 			count_edges(dsrchAry, PN_start, PN_stop, PN_time, dout23, dedgesPN, genes, MAX_PARENTS, c, scalerSum, edgesPN, errSync, sampleSum);
-			////edgePerNetworkKernel << < sampleSum + 1, c, (c * sizeof(int)) >> >(dout23, dedgesPN, dsrchAry, genes, MAX_PARENTS, c);
-			//edgePerNetworkKernel << < sampleSum + 1, 1 >> > (dout23, dedgesPN, dsrchAry, genes, MAX_PARENTS, c);
-			////printf("edgesPerNetworkKernel finished\n");
-			//cudaEventRecord(PN_stop, 0);
-			////HANDLE_ERROR(cudaMemcpy(edgesPN, dedgesPN, sizeof(int) * (scalerSum + 1), cudaMemcpyDeviceToHost));
-			//
-			////copy edge sums over to CPU to calculate prefix sum for edgesPN	
-			//HANDLE_ERROR(cudaMemcpy(tempEdgesSums, dedgesPN, sizeof(int) * (scalerSum + 1), cudaMemcpyDeviceToHost));	
-			//
-			//edgesPN[0] = 0;
-			//for(int i = 1; i < sampleSum + 1; i++)
-			//{
-			//	edgesPN[i] = edgesPN[i-1] + tempEdgesSums[i-1]; //prefix sum calculation
-			//}
-			////get rid of this temp array	
-			//free(tempEdgesSums); tempEdgesSums = NULL;
-			////edgesPN on the CPU is now fixed but dedgesPN is used later- copy edgesPN results back to GPU memory
-			//HANDLE_ERROR(cudaMemcpy(dedgesPN, edgesPN, sizeof(int) * (sampleSum + 1), cudaMemcpyHostToDevice));
-			//
-			///*
-			//for (int i = 0; i < scalerSum + 1; i++)
-			//{
-			//printf("edgesPN[%d] : %d\n", i, edgesPN[i]);
-			//}	
-			//*/
-			////exit(EXIT_FAILURE);
-			//
-			//errSync = cudaGetLastError();
-			//if (errSync != cudaSuccess)
-			//{
-			//	printf("%s\n", cudaGetErrorString(errSync));
-			//}
+			
 
-			///*for (int i = 0; i < scalerSum + 1; i++)
-			//{
-			//printf("edgesPN[%d] : %d\n", i, edgesPN[i]);
-			//}*/
-			////cudaEventRecord(PN_stop, 0);
-			//cudaEventSynchronize(PN_stop);
-			//cudaEventElapsedTime(&PN_time, PN_start, PN_stop);
-			//printf("edgesPerNetworkKernel time : %f\n", PN_time);
-			//cudaFree(d_ones); 
+
+
 			HANDLE_ERROR(cudaFree(dpriorMatrix)); dpriorMatrix = NULL;
 			HANDLE_ERROR(cudaFree(ddofout)); ddofout = NULL;
 			HANDLE_ERROR(cudaFree(dff)); dff = NULL;
@@ -1874,11 +1525,6 @@ int main(int argc, char *argv[])
 			//total number of edges
 			int numEdges = edgesPN[scalerSum];
 
-			//int N = c;
-			//int M = genesetlength - 1;
-			//int size1 = sizeof(int)*N*(scalerSum);
-			//int size222 = sizeof(double)*N*(scalerSum);
-			//*****************************************************************************************
 			//run22 launch- create parent graphs
 			int noNodes = genesetlength;
 			//host copies
@@ -1901,84 +1547,12 @@ int main(int argc, char *argv[])
 			//space alloc for host
 			pNodes = (int *)malloc(nodeSize);
 			pEdges = (int *)malloc(edgeSize);
-			//FILE *edgePNFile = fopen("edgePN2.txt", "w");
-			//for(int i = 0; i < scalerSum + 1; i++)
-			//{
-			//	fprintf(edgePNFile, "edgesPN[%d] : %d\n", i, edgesPN[i]);
-			//}
-			//fclose(edgePNFile);
 			build_graph(scalerSum, noNodes, c, dedgesPN, dout23, dpNodes, numEdges, dsrchAry, dpEdges, MAX_PARENTS, pNodes, pEdges, nodeSize, edgeSize);
-			//run22 << <scalerSum, noNodes >> >(c, dedgesPN, dout23, dpNodes, noNodes, numEdges, dsrchAry, dpEdges, MAX_PARENTS);
-			////printf("run22 finished\n");
-
-			//HANDLE_ERROR(cudaMemcpy(pNodes, dpNodes, nodeSize, cudaMemcpyDeviceToHost));
-			//HANDLE_ERROR(cudaMemcpy(pEdges, dpEdges, edgeSize, cudaMemcpyDeviceToHost));
-
-			///*for (int i = 0; i < nodeSize / sizeof(int); i++)
-			//{
-			//	if (i > edgeSize / sizeof(int))
-			//	{
-			//		printf("nodes[%d] : %d\n", i, pNodes[i]);
-			//	}
-			//	else
-			//	{
-			//		printf("nodes[%d] : %d edges[%d] : %d\n", i, pNodes[i], i, pEdges[i]);
-			//	}
-			//}*/
-
-			///*if (permNum == 0)
-			//{
-			//	
-			//	for (int i = 0; i < noNodes; i++)
-			//	{
-			//		printf("pNodes[%d] : %d\n", i, pNodes[i]);
-			//	}
-			//	for (int i = 11 * noNodes; i < (11 * noNodes) + noNodes; i++)
-			//	{
-			//		printf("pNodes[%d] : %d\n", i, pNodes[i]);
-			//	}
-			//}*/
-			//
-
-			////ensure parent limit
-			//checkParentLimit(scalerSum, noNodes, MAX_PARENTS, pNodes, nodeSize / sizeof(int));
-			///*for (int i = 0; i < nodeSize / sizeof(int); i++)
-			//{
-			//	if (i > edgeSize / sizeof(int))
-			//	{
-			//		printf("pNodes[%d] : %d\n", i, pNodes[i]);
-			//	}
-			//	else
-			//	{
-			//		printf("pNodes[%d] : %d\t pEdges[%d] : %d\n", i, pNodes[i], i, pEdges[i]);
-			//	}
-			//}*/
-			///*FILE *outputFile = fopen("NodesEdges2.txt", "w");
-			//for(int i = 0; i < nodeSize / sizeof(int); i++)
-			//{
-			//	fprintf(outputFile, "pNodes[%d] : %d\n", i, pNodes[i]);
-			//}
-			//for(int i = 0; i < edgeSize / sizeof(int); i++)
-			//{
-			//	fprintf(outputFile, "pEdges[%d] : %d\n", i, pEdges[i]);
-			//}
-
-			//fclose(outputFile); */
-			////printf("%d\n", numEdges);
 			
 			HANDLE_ERROR(cudaFree(dsrchAry)); dsrchAry = NULL;
 			HANDLE_ERROR(cudaFree(dout23)); dout23 = NULL;
 			//end run 22**********************************************************************************************/
 
-			////start processs to identify unique networks
-			//int scalerCombo = (scalerSum*scalerSum - scalerSum) / 2;
-			////host
-			//int *scalerTest; //compare value
-			//int *shrunk;
-			//int *shrunkPlc; //compare to
-			//scalerTest = (int *)malloc(sizeof(int)*scalerCombo);
-			//shrunk = (int *)malloc(sizeof(int)*scalerCombo);
-			//shrunkPlc = (int *)malloc(sizeof(int)*scalerCombo);
 
 			int scalerCombo = (scalerSum*scalerSum - scalerSum) / 2;
 			//host
@@ -1997,42 +1571,6 @@ int main(int argc, char *argv[])
 
 
 			mark_duplicate_networks(scalerSum, scalerCombo, scalerTest, shrunkPlc, shrunk, dshrunk, dscalerTest, dshnkplc, maxThreads, samples, numEdges, genesetlength, dedgesPN, dpNodes, dpEdges);
-
-
-			////see line 132 for more info
-			//idPrep(scalerSum, scalerCombo, scalerTest, shrunkPlc);
-
-			////dev copies
-			////launch for run 25 *****************************************************************************************
-			////int *dshrunk;
-			////int *dscalerTest;
-			////int *dshnkplc;
-			////HANDLE_ERROR(cudaMalloc((void**)&dshrunk, sizeof(int)*scalerCombo));
-			////HANDLE_ERROR(cudaMalloc((void**)&dscalerTest, sizeof(int)*scalerCombo));
-			////HANDLE_ERROR(cudaMalloc((void**)&dshnkplc, sizeof(int)*scalerCombo));
-
-			////cp into device
-			//HANDLE_ERROR(cudaMemcpy(dscalerTest, scalerTest, sizeof(int)*scalerCombo, cudaMemcpyHostToDevice));
-			//HANDLE_ERROR(cudaMemcpy(dshnkplc, shrunkPlc, sizeof(int)*scalerCombo, cudaMemcpyHostToDevice));
-			////************************************************************************************************
-			////(int scaler,int noEdges, int gLength,int scalerCombo, int *dedgesPN, int  *dNodes, int *dedgeAry, int *shrunk)
-			//// 
-
-			////printf("%/ max: %d   ", maxBlocks*maxThreads);
-			////printf("\n");
-			//run25 << <(scalerCombo / (maxThreads - 1)) + 1, maxThreads - 1 >> >(samples + 1, scalerSum, numEdges, genesetlength, scalerCombo, dedgesPN, dpNodes, dpEdges, dshrunk, dscalerTest, dshnkplc);
-			////printf("run25 finished\n");
-			////*********************************************************************************************
-			//HANDLE_ERROR(cudaMemcpy(shrunk, dshrunk, sizeof(int)*scalerCombo, cudaMemcpyDeviceToHost));
-			////*************************test****************************************
-			//cudaFree(dshrunk); dshrunk = NULL;
-			//cudaFree(dscalerTest); dscalerTest = NULL;
-			//cudaFree(dshnkplc); dshnkplc = NULL;
-			//cudaFree(dedgesPN); dedgesPN = NULL;
-			//cudaFree(dpEdges); dpEdges = NULL;
-			//cudaFree(dpNodes); dpNodes = NULL;
-			//free(shrunkPlc); shrunkPlc = NULL;
-
 
 
 			bool *uniqueN, *visted;
@@ -2127,11 +1665,8 @@ int main(int argc, char *argv[])
 
 
 			structureUnique(unisum, numEdges, scaler, scalerSum, noNodes, uniqueN, edgesPN, pEdges, pNodes, pUniEdges, pUniNodes, pUniEpn);
-			//printf("structureUnique (NOT A KERNEL) finished\n");
-			/*for (int i = 0; i < uniEpnSize; i++)
-			{
-				printf("pUniEpn[%d] : %d\n", i, pUniEpn[i]);
-			}*/
+			
+
 			free(edgesPN); edgesPN = NULL;
 			free(pNodes); pNodes = NULL;
 			free(pEdges); pEdges = NULL;
@@ -2139,25 +1674,6 @@ int main(int argc, char *argv[])
 
 			//ensure parent limit
 			checkParentLimit(unisum, noNodes, MAX_PARENTS, pUniNodes, unisum * noNodes);
-			/*for (int i = 0; i < unisum * noNodes; i++)
-			{
-				if (i > edSum)
-				{
-					printf("pNodes[%d] : %d\n", i, pUniNodes[i]);
-				}
-				else
-				{
-					printf("pNodes[%d] : %d\t pEdges[%d] : %d\n", i, pUniNodes[i], i, pUniEdges[i]);
-				}
-			}
-
-			for (int i = 0; i < edSum; i++)
-			{
-				printf("pUniEdges[%d] : %d\n", i, pUniEdges[i]);
-			}
-			printf("%d\n", edSum);*/
-
-
 
 
 			if (permNum == 0)
@@ -2176,9 +1692,6 @@ int main(int argc, char *argv[])
 			}
 
 
-
-
-			
 
 			scaler = unisum;
 			if (permNum == 0)	{ first_scaler = scaler; }
@@ -2207,32 +1720,6 @@ int main(int argc, char *argv[])
 
 
 			score_networks(out5, dout5, dpEdges2, dpNodes2, dNij, dNijk, dUniEpn, uniEdgeSize, uniNodeSize, unisum, noNodes, scaler, pUniEdges, pUniNodes, pUniEpn, genesetlength, edSum, samples, samples2, dtriA, dtriAb, dppn, dstf, dppnLength);
-
-
-			////cp to devp'4
-			//
-
-			//HANDLE_ERROR(cudaMemcpy(dpEdges2, pUniEdges, uniEdgeSize, cudaMemcpyHostToDevice));
-			//HANDLE_ERROR(cudaMemcpy(dpNodes2, pUniNodes, uniNodeSize, cudaMemcpyHostToDevice));
-			////HANDLE_ERROR(cudaMemcpy(dUniEpn, pUniEpn, sizeof(int)*uniEpnSize, cudaMemcpyHostToDevice));
-			//HANDLE_ERROR(cudaMemcpy(dUniEpn, pUniEpn, sizeof(int) * unisum, cudaMemcpyHostToDevice));
-			//free(pUniNodes); pUniNodes = NULL;
-			//free(pUniEdges); pUniEdges = NULL;
-			//free(pUniEpn); pUniEpn = NULL;
-
-			//cudaEvent_t run4Start, run4End;
-			//cudaEventCreate(&run4Start);
-			//cudaEventCreate(&run4End);
-			//cudaEventRecord(run4Start, 0);
-			//float run4Time;
-
-			//run4 << <scaler * 2, noNodes >> >(scaler, dUniEpn, genesetlength, edSum, unisum, samples, samples2, dtriA, dtriAb, dpEdges2, dpNodes2, dppn, dstf, dNij, dNijk, dout5, dppnLength);
-			////printf("run 4 finished\n");
-			//cudaEventRecord(run4End, 0);
-			//cudaEventSynchronize(run4End);
-			//cudaEventElapsedTime(&run4Time, run4Start, run4End);
-			////printf("run 4 time : %f\n", run4Time);
-			//HANDLE_ERROR(cudaMemcpy(out5, dout5, sizeof(double)*noNodes*scaler * 2, cudaMemcpyDeviceToHost));
 
 			HANDLE_ERROR(cudaFree(dNij)); dNij = NULL;
 			HANDLE_ERROR(cudaFree(dNijk)); dNijk = NULL;
@@ -2265,119 +1752,8 @@ int main(int argc, char *argv[])
 
 			// compute likelihood of different dataset parsed by 2 iterations 
 			compute_likelihood(scaler, noNodes, out5, lval1);
-//			for (int g = 0; g < 2; g++){
-//				int set = 0;
-//				int place = 0;
-//				double scoreSum = 0;
-//				double *likeli1;
-//				double min = 0;
-//				double max = 0;
-//				double inAlpha = 0;
-//				double probScale = 0;
-//				double likeliSum = 0;
-//				double nonInf = 0;
-//				double *dist;
-//
-//				double *adjusted;
-//				double *infFlag;
-//				double *outq;
-//				int localoffset;
-//				outq = out5;
-//				if (g < 1){
-//
-//					localoffset = 0;
-//				}
-//				else
-//				{
-//
-//					localoffset = scaler;
-//
-//				}
-//
-//				dist = (double *)malloc(sizeof(double)*scaler);
-//				likeli1 = (double *)malloc(sizeof(double)*scaler);
-//				adjusted = (double *)malloc(sizeof(double)*scaler);
-//				infFlag = (double *)malloc(sizeof(double)*scaler);
-//				for (int k2 = 0; k2 < scaler; k2++){
-//
-//					dist[k2] = 0.0;
-//
-//					adjusted[k2] = 0.0;
-//					infFlag[k2] = 0.0;
-//
-//				}
-//				for (int i = 0; i < scaler*noNodes; i++){
-//
-//					dist[place] += outq[i + localoffset*noNodes];
-//					set++;
-//					if (set == noNodes){
-//						set = 0;
-//						place++;
-//					}
-//				}
-//
-//				min = dist[0];
-//				max = dist[0];
-//				for (int j3 = 0; j3 < scaler; j3++){
-//					//			printf(" dis %d %f \n", j3, dist[j3]);
-//					scoreSum += dist[j3];
-//					if (dist[j3]>max){
-//
-//						max = dist[j3];
-//					}
-//					if (dist[j3] < min){
-//
-//						min = dist[j3];
-//					}
-//
-//				}
-//
-//
-//				inAlpha = -1 * (scoreSum / scaler);
-//				//printf("\n min-%f max-%f", min, max);
-//				//printf("inAlpha-%f", inAlpha);
-//				probScale = (10) / (max - min);
-//
-//				for (int m = 0; m < scaler; m++){
-//
-//					adjusted[m] = (dist[m] + inAlpha)*probScale;
-//					//			printf("\n adjusted: %f", adjusted[m]);
-//					likeli1[m] = exp(adjusted[m]);
-//					//			printf("\n likeli: %f", likeli1[m]);
-//					nonInf += likeli1[m];
-//					//likeLi[m] = posInf;
-//					//suppress overflow infinity error
-//					#pragma warning(suppress: 4056)
-//					if (likeli1[m] >= INFINITY || likeli1[m] <= -INFINITY){
-//						infFlag[m] = 1.0;
-//						likeliSum++;
-//					}
-//
-//				}
-//				free(dist); dist = NULL;
-//				free(adjusted); adjusted = NULL;
-//				//	printf("\n likesum: %f nonInf: %f", likeliSum, nonInf);
-//
-//				if (likeliSum == 0){
-//					for (int meow = 0; meow < scaler; meow++){
-//						likeli1[meow] = likeli1[meow] / nonInf;
-//						lval1[meow + localoffset] = likeli1[meow];
-//
-//					}
-//
-//				}
-//				else{
-//					for (int meow = 0; meow < scaler; meow++){
-//						likeli1[meow] = infFlag[meow] / likeliSum;
-//						lval1[meow + localoffset] = likeli1[meow];
-//					}
-//				}
-//
-//				free(likeli1); likeli1 = NULL;
-//				free(infFlag); infFlag = NULL;
-//				outq = NULL;
-//			}
-//
+			
+
 			if (permNum == 0)
 			{
 				first_lval1 = (double *)malloc(sizeof(double) * scaler * 2);
@@ -2401,11 +1777,9 @@ int main(int argc, char *argv[])
 
 			//final score
 			js = kool(lval1, sea, 0, scaler) / 2 + kool(lval1, sea, scaler, scaler) / 2;
-			//printf("\njs: %f\n", js / logger);
 			assert(permNum < perms);
 			jsVals[permNum] = js / logger;
 
-			//printf("permutation : %d\n", permNum);
 			if (isnan(jsVals[0]))
 			{
 				printf("jsVal[0] NAN--Breaking permutation loop\n");
@@ -2416,20 +1790,11 @@ int main(int argc, char *argv[])
 			
 			
 
-			/****************************time**********************************/
 			cudaEventRecord(stop, 0);
 			cudaEventSynchronize(stop);
 
 			cudaEventElapsedTime(&time, start, stop);
 
-
-
-			/*************************************************/
-
-
-
-			//printf("\n Time1 for the kernel: %f ms\n", time);
-			//printf("\n\n");
 
 			free(sea); sea = NULL;
 			free(out5); out5 = NULL;
@@ -2465,20 +1830,7 @@ int main(int argc, char *argv[])
 		printf("\n\n\n\npermutations finished\n");
 		//count how many js values are larger than initial run
 		printf("Original JS : %f\n", jsVals[0]);
-		/*int largerTally = 0;
-		for (int i = 1; i < perms; i++)
-		{
 
-			if (jsVals[i] > jsVals[0])
-			{
-				largerTally++;
-			}
-		}*/
-
-		//double p_val = 0.0;
-		//printf("number larger : %d\n", largerTally);
-		//p_val = largerTally / (perms * 1.0);
-		//printf("p = %f\n", p_val);
 		double p = 0;
 		
 		if (perms > 0)
@@ -2488,7 +1840,6 @@ int main(int argc, char *argv[])
 			double alpha = (((1 - mu) / var) - (1 / mu)) * pow(mu, 2);
 			double beta = alpha * (1 / mu - 1);
 			printf("alpha : %f beta : %f\n", alpha, beta);
-			//p = 1 - betaCDF(jsVals[0], alpha, beta);
 			p = boost::math::ibetac(alpha, beta, jsVals[0]);
 
 			printf("p = %f\n", p);
@@ -2508,8 +1859,6 @@ int main(int argc, char *argv[])
 			writeNetworkFile(networkFilePath, inputFile, classFile, pathwayName, first_unisum, first_uniEpn, genesetgenes, genesetlength, first_uniNodes, first_uniEdges, first_numEdges, uniqueNetIds);
 			writeBdeuScores(bdeuFilePath, inputFile, classFile, pathwayName, class1, class2, first_scaler, first_lval1);
 
-			//printf("\nOriginal JS score : %f\n", jsVals[0]);
-			//printf("Original number of unique networks : %d\n", first_unisum);
 
 			//-----------------------------------------------------
 			//edgeList calcs
@@ -2563,18 +1912,6 @@ int main(int argc, char *argv[])
 			HANDLE_ERROR(cudaMemcpy(dEdgesPN, edgesPN, sizeof(int) * (numNetworks + 1), cudaMemcpyHostToDevice));
 
 
-			/*for (int i = 0; i < 3; i++)
-			{
-				printf("edgesPN[%d]  : %d\n", i, edgesPN[i]);
-			}
-			
-			for (int i = 0; i < genesetlength; i++)
-			{
-				printf("%d : %s\n", i, genesetgenes[i]);
-			}*/
-
-
-
 			//needed to calculate how long to make edge array
 			int totalEdges = edgesPN[2];
 
@@ -2612,12 +1949,7 @@ int main(int argc, char *argv[])
 
 			//printf("Total Run Time : %f\n", totalTime);
 
-			//FILE *timeFile = fopen("Time.txt", "w");
-			//fprintf(timeFile, "%f", totalTime);
-			//output number of unique networks to check against java scores
 			printf("Total run time : %f\n", totalTime);
-			//fprintf(timeFile, "%f", totalTime);
-			//fclose(timeFile);
 			free(nodes); nodes = NULL;
 			free(edges); edges = NULL;
 		}
@@ -2646,9 +1978,7 @@ int main(int argc, char *argv[])
 		free(uniqueNetIds);
 		free(edgeListData1);
 		free(edgeListData2);
-		//free(initialFF);
 		free(initialSearcher);
-		//free(initialSpacr);
 		first_lval1 = NULL;
 		first_uniNodes = NULL;
 		first_uniEdges = NULL;
@@ -2657,9 +1987,7 @@ int main(int argc, char *argv[])
 		uniqueNetIds = NULL;
 		edgeListData1 = NULL;
 		edgeListData2 = NULL;
-		//initialFF = NULL;
 		initialSearcher = NULL;
-		//initialSpacr = NULL;
 
 	}
 	fclose(fp3);
@@ -2667,9 +1995,6 @@ int main(int argc, char *argv[])
 
 	free(data);
 	data = NULL;
-	//use to make sure all data is recorded and visual
-	//profiler works
-	//cudaDeviceReset();
 
 	return 0;
 }
