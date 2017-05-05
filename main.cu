@@ -942,6 +942,74 @@ void build_graph(int scalerSum, int noNodes, int c, int *dedgesPN, int *dout23, 
 
 
 
+void mark_duplicate_networks(int scalerSum, int scalerCombo, int *scalerTest, int *shrunkPlc, int *shrunk, int *dshrunk, int *dscalerTest, int *dshnkplc, int maxThreads, int samples, int numEdges, int genesetlength, int *dedgesPN, int *dpNodes, int *dpEdges)
+{
+
+	idPrep(scalerSum, scalerCombo, scalerTest, shrunkPlc);
+
+	//dev copies
+	//launch for run 25 *****************************************************************************************
+	
+
+	//cp into device
+	HANDLE_ERROR(cudaMemcpy(dscalerTest, scalerTest, sizeof(int)*scalerCombo, cudaMemcpyHostToDevice));
+	HANDLE_ERROR(cudaMemcpy(dshnkplc, shrunkPlc, sizeof(int)*scalerCombo, cudaMemcpyHostToDevice));
+	//************************************************************************************************
+	//(int scaler,int noEdges, int gLength,int scalerCombo, int *dedgesPN, int  *dNodes, int *dedgeAry, int *shrunk)
+	// 
+
+	//printf("%/ max: %d   ", maxBlocks*maxThreads);
+	//printf("\n");
+	run25 << <(scalerCombo / (maxThreads - 1)) + 1, maxThreads - 1 >> >(samples + 1, scalerSum, numEdges, genesetlength, scalerCombo, dedgesPN, dpNodes, dpEdges, dshrunk, dscalerTest, dshnkplc);
+	//printf("run25 finished\n");
+	//*********************************************************************************************
+	HANDLE_ERROR(cudaMemcpy(shrunk, dshrunk, sizeof(int)*scalerCombo, cudaMemcpyDeviceToHost));
+	//*************************test****************************************
+	cudaFree(dshrunk); dshrunk = NULL;
+	cudaFree(dscalerTest); dscalerTest = NULL;
+	cudaFree(dshnkplc); dshnkplc = NULL;
+	cudaFree(dedgesPN); dedgesPN = NULL;
+	cudaFree(dpEdges); dpEdges = NULL;
+	cudaFree(dpNodes); dpNodes = NULL;
+	free(shrunkPlc); shrunkPlc = NULL;
+
+
+}
+
+void score_networks(double *out5, double *dout5, int *dpEdges2, int *dpNodes2, int *dNij, int *dNijk, int *dUniEpn, int uniEdgeSize, int uniNodeSize, int unisum, int noNodes, int scaler, int *pUniEdges, int *pUniNodes, int *pUniEpn, int genesetlength, int edSum, int samples, int samples2, int *dtriA, int *dtriAb, int *dppn, int *dstf, int dppnLength)
+{
+
+
+//cp to devp'4
+	
+
+	HANDLE_ERROR(cudaMemcpy(dpEdges2, pUniEdges, uniEdgeSize, cudaMemcpyHostToDevice));
+	HANDLE_ERROR(cudaMemcpy(dpNodes2, pUniNodes, uniNodeSize, cudaMemcpyHostToDevice));
+	//HANDLE_ERROR(cudaMemcpy(dUniEpn, pUniEpn, sizeof(int)*uniEpnSize, cudaMemcpyHostToDevice));
+	HANDLE_ERROR(cudaMemcpy(dUniEpn, pUniEpn, sizeof(int) * unisum, cudaMemcpyHostToDevice));
+	free(pUniNodes); pUniNodes = NULL;
+	free(pUniEdges); pUniEdges = NULL;
+	free(pUniEpn); pUniEpn = NULL;
+
+	cudaEvent_t run4Start, run4End;
+	cudaEventCreate(&run4Start);
+	cudaEventCreate(&run4End);
+	cudaEventRecord(run4Start, 0);
+	float run4Time;
+
+	run4 << <scaler * 2, noNodes >> >(scaler, dUniEpn, genesetlength, edSum, unisum, samples, samples2, dtriA, dtriAb, dpEdges2, dpNodes2, dppn, dstf, dNij, dNijk, dout5, dppnLength);
+	//printf("run 4 finished\n");
+	cudaEventRecord(run4End, 0);
+	cudaEventSynchronize(run4End);
+	cudaEventElapsedTime(&run4Time, run4Start, run4End);
+	//printf("run 4 time : %f\n", run4Time);
+	HANDLE_ERROR(cudaMemcpy(out5, dout5, sizeof(double)*noNodes*scaler * 2, cudaMemcpyDeviceToHost));
+
+
+}
+
+
+
 int main(int argc, char *argv[])
 {
 	//looking at GPU properties
@@ -977,7 +1045,7 @@ int main(int argc, char *argv[])
 		
 
 	}
-	printf("This is the updated modular version");
+	printf("This is the updated modular version with run4 module");
 
 	int startT = getMilliCount();
 	//int start1 = getMilliCount();
@@ -1902,7 +1970,16 @@ int main(int argc, char *argv[])
 			HANDLE_ERROR(cudaFree(dout23)); dout23 = NULL;
 			//end run 22**********************************************************************************************/
 
-			//start processs to identify unique networks
+			////start processs to identify unique networks
+			//int scalerCombo = (scalerSum*scalerSum - scalerSum) / 2;
+			////host
+			//int *scalerTest; //compare value
+			//int *shrunk;
+			//int *shrunkPlc; //compare to
+			//scalerTest = (int *)malloc(sizeof(int)*scalerCombo);
+			//shrunk = (int *)malloc(sizeof(int)*scalerCombo);
+			//shrunkPlc = (int *)malloc(sizeof(int)*scalerCombo);
+
 			int scalerCombo = (scalerSum*scalerSum - scalerSum) / 2;
 			//host
 			int *scalerTest; //compare value
@@ -1911,13 +1988,6 @@ int main(int argc, char *argv[])
 			scalerTest = (int *)malloc(sizeof(int)*scalerCombo);
 			shrunk = (int *)malloc(sizeof(int)*scalerCombo);
 			shrunkPlc = (int *)malloc(sizeof(int)*scalerCombo);
-
-
-			//see line 132 for more info
-			idPrep(scalerSum, scalerCombo, scalerTest, shrunkPlc);
-
-			//dev copies
-			//launch for run 25 *****************************************************************************************
 			int *dshrunk;
 			int *dscalerTest;
 			int *dshnkplc;
@@ -1925,27 +1995,43 @@ int main(int argc, char *argv[])
 			HANDLE_ERROR(cudaMalloc((void**)&dscalerTest, sizeof(int)*scalerCombo));
 			HANDLE_ERROR(cudaMalloc((void**)&dshnkplc, sizeof(int)*scalerCombo));
 
-			//cp into device
-			HANDLE_ERROR(cudaMemcpy(dscalerTest, scalerTest, sizeof(int)*scalerCombo, cudaMemcpyHostToDevice));
-			HANDLE_ERROR(cudaMemcpy(dshnkplc, shrunkPlc, sizeof(int)*scalerCombo, cudaMemcpyHostToDevice));
-			//************************************************************************************************
-			//(int scaler,int noEdges, int gLength,int scalerCombo, int *dedgesPN, int  *dNodes, int *dedgeAry, int *shrunk)
-			// 
 
-			//printf("%/ max: %d   ", maxBlocks*maxThreads);
-			//printf("\n");
-			run25 << <(scalerCombo / (maxThreads - 1)) + 1, maxThreads - 1 >> >(samples + 1, scalerSum, numEdges, genesetlength, scalerCombo, dedgesPN, dpNodes, dpEdges, dshrunk, dscalerTest, dshnkplc);
-			//printf("run25 finished\n");
-			//*********************************************************************************************
-			HANDLE_ERROR(cudaMemcpy(shrunk, dshrunk, sizeof(int)*scalerCombo, cudaMemcpyDeviceToHost));
-			//*************************test****************************************
-			cudaFree(dshrunk); dshrunk = NULL;
-			cudaFree(dscalerTest); dscalerTest = NULL;
-			cudaFree(dshnkplc); dshnkplc = NULL;
-			cudaFree(dedgesPN); dedgesPN = NULL;
-			cudaFree(dpEdges); dpEdges = NULL;
-			cudaFree(dpNodes); dpNodes = NULL;
-			free(shrunkPlc); shrunkPlc = NULL;
+			mark_duplicate_networks(scalerSum, scalerCombo, scalerTest, shrunkPlc, shrunk, dshrunk, dscalerTest, dshnkplc, maxThreads, samples, numEdges, genesetlength, dedgesPN, dpNodes, dpEdges);
+
+
+			////see line 132 for more info
+			//idPrep(scalerSum, scalerCombo, scalerTest, shrunkPlc);
+
+			////dev copies
+			////launch for run 25 *****************************************************************************************
+			////int *dshrunk;
+			////int *dscalerTest;
+			////int *dshnkplc;
+			////HANDLE_ERROR(cudaMalloc((void**)&dshrunk, sizeof(int)*scalerCombo));
+			////HANDLE_ERROR(cudaMalloc((void**)&dscalerTest, sizeof(int)*scalerCombo));
+			////HANDLE_ERROR(cudaMalloc((void**)&dshnkplc, sizeof(int)*scalerCombo));
+
+			////cp into device
+			//HANDLE_ERROR(cudaMemcpy(dscalerTest, scalerTest, sizeof(int)*scalerCombo, cudaMemcpyHostToDevice));
+			//HANDLE_ERROR(cudaMemcpy(dshnkplc, shrunkPlc, sizeof(int)*scalerCombo, cudaMemcpyHostToDevice));
+			////************************************************************************************************
+			////(int scaler,int noEdges, int gLength,int scalerCombo, int *dedgesPN, int  *dNodes, int *dedgeAry, int *shrunk)
+			//// 
+
+			////printf("%/ max: %d   ", maxBlocks*maxThreads);
+			////printf("\n");
+			//run25 << <(scalerCombo / (maxThreads - 1)) + 1, maxThreads - 1 >> >(samples + 1, scalerSum, numEdges, genesetlength, scalerCombo, dedgesPN, dpNodes, dpEdges, dshrunk, dscalerTest, dshnkplc);
+			////printf("run25 finished\n");
+			////*********************************************************************************************
+			//HANDLE_ERROR(cudaMemcpy(shrunk, dshrunk, sizeof(int)*scalerCombo, cudaMemcpyDeviceToHost));
+			////*************************test****************************************
+			//cudaFree(dshrunk); dshrunk = NULL;
+			//cudaFree(dscalerTest); dscalerTest = NULL;
+			//cudaFree(dshnkplc); dshnkplc = NULL;
+			//cudaFree(dedgesPN); dedgesPN = NULL;
+			//cudaFree(dpEdges); dpEdges = NULL;
+			//cudaFree(dpNodes); dpNodes = NULL;
+			//free(shrunkPlc); shrunkPlc = NULL;
 
 
 
@@ -2120,31 +2206,33 @@ int main(int argc, char *argv[])
 			out5 = (double *)malloc(sizeof(double)*noNodes*scaler * 2);
 
 
+			score_networks(out5, dout5, dpEdges2, dpNodes2, dNij, dNijk, dUniEpn, uniEdgeSize, uniNodeSize, unisum, noNodes, scaler, pUniEdges, pUniNodes, pUniEpn, genesetlength, edSum, samples, samples2, dtriA, dtriAb, dppn, dstf, dppnLength);
 
-			//cp to devp'4
-			
 
-			HANDLE_ERROR(cudaMemcpy(dpEdges2, pUniEdges, uniEdgeSize, cudaMemcpyHostToDevice));
-			HANDLE_ERROR(cudaMemcpy(dpNodes2, pUniNodes, uniNodeSize, cudaMemcpyHostToDevice));
-			//HANDLE_ERROR(cudaMemcpy(dUniEpn, pUniEpn, sizeof(int)*uniEpnSize, cudaMemcpyHostToDevice));
-			HANDLE_ERROR(cudaMemcpy(dUniEpn, pUniEpn, sizeof(int) * unisum, cudaMemcpyHostToDevice));
-			free(pUniNodes); pUniNodes = NULL;
-			free(pUniEdges); pUniEdges = NULL;
-			free(pUniEpn); pUniEpn = NULL;
+			////cp to devp'4
+			//
 
-			cudaEvent_t run4Start, run4End;
-			cudaEventCreate(&run4Start);
-			cudaEventCreate(&run4End);
-			cudaEventRecord(run4Start, 0);
-			float run4Time;
+			//HANDLE_ERROR(cudaMemcpy(dpEdges2, pUniEdges, uniEdgeSize, cudaMemcpyHostToDevice));
+			//HANDLE_ERROR(cudaMemcpy(dpNodes2, pUniNodes, uniNodeSize, cudaMemcpyHostToDevice));
+			////HANDLE_ERROR(cudaMemcpy(dUniEpn, pUniEpn, sizeof(int)*uniEpnSize, cudaMemcpyHostToDevice));
+			//HANDLE_ERROR(cudaMemcpy(dUniEpn, pUniEpn, sizeof(int) * unisum, cudaMemcpyHostToDevice));
+			//free(pUniNodes); pUniNodes = NULL;
+			//free(pUniEdges); pUniEdges = NULL;
+			//free(pUniEpn); pUniEpn = NULL;
 
-			run4 << <scaler * 2, noNodes >> >(scaler, dUniEpn, genesetlength, edSum, unisum, samples, samples2, dtriA, dtriAb, dpEdges2, dpNodes2, dppn, dstf, dNij, dNijk, dout5, dppnLength);
-			//printf("run 4 finished\n");
-			cudaEventRecord(run4End, 0);
-			cudaEventSynchronize(run4End);
-			cudaEventElapsedTime(&run4Time, run4Start, run4End);
-			//printf("run 4 time : %f\n", run4Time);
-			HANDLE_ERROR(cudaMemcpy(out5, dout5, sizeof(double)*noNodes*scaler * 2, cudaMemcpyDeviceToHost));
+			//cudaEvent_t run4Start, run4End;
+			//cudaEventCreate(&run4Start);
+			//cudaEventCreate(&run4End);
+			//cudaEventRecord(run4Start, 0);
+			//float run4Time;
+
+			//run4 << <scaler * 2, noNodes >> >(scaler, dUniEpn, genesetlength, edSum, unisum, samples, samples2, dtriA, dtriAb, dpEdges2, dpNodes2, dppn, dstf, dNij, dNijk, dout5, dppnLength);
+			////printf("run 4 finished\n");
+			//cudaEventRecord(run4End, 0);
+			//cudaEventSynchronize(run4End);
+			//cudaEventElapsedTime(&run4Time, run4Start, run4End);
+			////printf("run 4 time : %f\n", run4Time);
+			//HANDLE_ERROR(cudaMemcpy(out5, dout5, sizeof(double)*noNodes*scaler * 2, cudaMemcpyDeviceToHost));
 
 			HANDLE_ERROR(cudaFree(dNij)); dNij = NULL;
 			HANDLE_ERROR(cudaFree(dNijk)); dNijk = NULL;
