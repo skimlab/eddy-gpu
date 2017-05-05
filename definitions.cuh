@@ -11,12 +11,10 @@ const char DIR[20] = "PRIORS\\";
 const char DIR[20] = "PRIORS/";
 #include <errno.h>
 #endif
-#define HANDLE_ERROR( err ) ( HandleError( err, __FILE__, __LINE__ ) )
 
 
 
 //CPU methods
-static void HandleError(cudaError_t err, const char *file, int line);
 void checkCUDAError(const char *msg);
 void idPrep(int fixd, int combo, int *ary1, int *ary2);
 double kool(double *P, double *Q, int scaler, int scaler1);
@@ -34,7 +32,7 @@ __host__ void writeEdgeListFile(char *outputFile, char *inputName, char *classNa
 __host__ double mean(double *a, size_t size);
 __host__ double variance(double mean, double *a, size_t size);
 __host__ void checkParentLimit(int numNetworks, int numNodes, int maxParents, int *nodes, size_t size);
-
+__host__ void compute_likelihood(int scaler, int noNodes, double *out5, double *lval1);
 
 
 //CPU graph struct
@@ -47,7 +45,7 @@ typedef struct graphNode {
 
 
 
-//GPU methods
+//GPU kernel methods
 __device__ void njLoop(int flag, int *stateSpaces, int node, int ssIdx, int noGenes,
 	int samples, int noParents, int noParentsInstances, int *parentArray,
 	int *stateFlags, int *data,
@@ -82,6 +80,12 @@ __global__ void noStates_kernel(const int noGenes, int samples1, int samples2, i
 
 
 
+//gpu routines bundled inside cpu functions
+int calculate_edges(int scalerSum, int samples, int samples2, int genesetlength, int size2, int c, int genes, int *transferdata1, int *transferdata2, int *ff1, int *priorMatrix, int *spacer1, cudaEvent_t start, cudaEvent_t stop, float time, double pw, int *edgeListData1, int *edgeListData2, int *dout23, int *dedgesPN, int *dtriA, int *dtriAb, int *ddofout, int *dppn, int *dstf, int *dff, int *dspacr, int *dpriorMatrix, int numclass1, int numclass2, int permNum);
+void count_edges(int *dsrchAry, cudaEvent_t PN_start, cudaEvent_t PN_stop, float PN_time, int *dout23, int *dedgesPN, int genes, int MAX_PARENTS, int c, int scalerSum, int *edgesPN, cudaError_t errSync, int sampleSum);
+void build_graph(int scalerSum, int noNodes, int c, int *dedgesPN, int *dout23, int *dpNodes, int numEdges, int *dsrchAry, int *dpEdges, int MAX_PARENTS, int *pNodes, int *pEdges, int nodeSize, int edgeSize);
+void mark_duplicate_networks(int scalerSum, int scalerCombo, int *scalerTest, int *shrunkPlc, int *shrunk, int *dshrunk, int *dscalerTest, int *dshnkplc, int maxThreads, int samples, int numEdges, int genesetlength, int *dedgesPN, int *dpNodes, int *dpEdges);
+void score_networks(double *out5, double *dout5, int *dpEdges2, int *dpNodes2, int *dNij, int *dNijk, int *dUniEpn, int uniEdgeSize, int uniNodeSize, int unisum, int noNodes, int scaler, int *pUniEdges, int *pUniNodes, int *pUniEpn, int genesetlength, int edSum, int samples, int samples2, int *dtriA, int *dtriAb, int *dppn, int *dstf, int dppnLength);
 
 
 
