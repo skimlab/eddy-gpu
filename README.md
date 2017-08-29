@@ -9,7 +9,7 @@ Compile:
 
 On Texas Advanced Computing Center's (TACC) Maverick cluster compiling eddy-gpu is:
 
-```make
+```make```
 
 If nvcc is not listed as a command, you must load the CUDA module. For TACC Maverick, to load cuda version 7.5:
 
