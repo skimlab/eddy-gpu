@@ -5,7 +5,7 @@ eddy-gpu requires the Boost C++ library - boost/math/special_functions/ - for it
 # Compiling
 Compile:
 
-```nvcc -o executable_name -I boost_include_path -L boost_library_path  main.cu```
+```make```
 
 On Texas Advanced Computing Center's (TACC) Maverick cluster compiling eddy-gpu is:
 
