@@ -42,3 +42,5 @@ If the analysis is deemed significant according to the predetermined p value, th
 ```geneset_file_name_EdgeList.txt``` contains a list of edges with the class labeling and if the edge was determined from prior knowledge
 
 ```geneset_file_name_Networks.txt``` contains all of the edges for each unique network.
+# Sponsor
+The development of EDDY-GPU is partially funded by Compute the Cure|NVIDIA (https://blogs.nvidia.com/blog/2016/11/23/compute-the-cure-4/).
