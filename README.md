@@ -46,3 +46,4 @@ If the analysis is deemed significant according to the predetermined p value, th
 The development of EDDY-GPU is partially funded by Compute the Cure|NVIDIA (https://blogs.nvidia.com/blog/2016/11/23/compute-the-cure-4/).
 
 [Citation] the manuscript describing EDDY-GPU has been accepted as a short paper to PDP 2018 (http://www.pdp2018.org/program.html).
+Gil Speyer, Juan Rodriguez, Tomas Bencomo and Seungchan Kim, "GPU-accelerated differential dependency network analysis", PDP 2018, Cambridge, UK, Mar 21-23, 2018.
