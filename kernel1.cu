@@ -2,6 +2,9 @@
 #include "assert.h"
 #include <stdio.h>
 
+# This function is an implementation of Algorithm AS 147:
+#   available from http://ftp.uni-bayreuth.de/math/statlib/apstat/147
+#
 __device__ double deviceGammds(double x, double p)
 {
 	double a;
