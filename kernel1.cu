@@ -5,6 +5,8 @@
 # This function is an implementation of Algorithm AS 147:
 #   available from http://ftp.uni-bayreuth.de/math/statlib/apstat/147
 #
+# Also refers to https://en.wikipedia.org/wiki/Chi-square_distribution
+#   for what it does.
 __device__ double deviceGammds(double x, double p)
 {
 	double a;
