@@ -32,6 +32,10 @@ eddy-gpu has the following command line parameters:
 
 ```-pw``` the prior knowledge weight
 
+```-t``` theta for edge threshold
+
+```-l``` lambda for edge threshold
+
 Example command:
 ```./eddy -d input200.txt -c NKFB200.txt -g geneset40.txt -r 100 -mp 3 -pw .5 -p .05```
 # Results

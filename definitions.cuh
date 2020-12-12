@@ -74,9 +74,9 @@ __device__ double sumrtime(const int offset, const int len, int *data, int *spc,
 __device__ double sumrtimeScalable(const int offset, const int len, int *data, int *spc, int *fr, int* dof, int idx, int netID, int globalIdx);
 __device__ void noStates(const int idx, const int noGenes, int samples1, int samples2, int *data1, int *data2, int *out1, int *out2);
 __global__ void run2(const int noGenes, const int leng, const int lengb, int *tary, int *taryb, int  *spacr, int *ff,
-	int *dofout, int *ppn, int *stf, int *out, int c, int *priorMatrix, double pw);
+	int *dofout, int *ppn, int *stf, int *out, int c, int *priorMatrix, double pw, double thresh);
 __global__ void run2Scalable(const int noGenes, const int leng, const int lengb, int *tary, int *taryb, int *spacr, int *ff,
-							int *dofout, int *ppn, int *stf, int *out, int c, int *priorMatrix, double pw, int BPN, int TPB);
+				int *dofout, int *ppn, int *stf, int *out, int c, int *priorMatrix, double pw, double thresh, int BPN, int TPB);
 __global__ void edgePerNetworkKernel(int *input, int *output, int *srchAry, int numNodes, const int maxParents, int c);
 __global__ void noStates_kernel(const int noGenes, int samples1, int samples2, int *data1, int *data2, int *out1, int *out2);
 

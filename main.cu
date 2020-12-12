@@ -92,6 +92,9 @@ int main(int argc, char *argv[])
 	int perms = 0; // 1 permutation
 	double pw = 1.0; //default - no prior weight
 	double pThreshold = .05; //default value
+    double theta = 0.8;
+    double lambda = 2.0;
+    double thresh;
 
 	//-d for input
 	//-g for geneset
@@ -99,6 +102,8 @@ int main(int argc, char *argv[])
 	//-mp for max parents
 	//-p for p threshold value
 	//-r number of permutations
+	//-t for theta
+	//-l for lambda
 	//-pw prior weight = [0,1]
 	//loop through argv, determining location of each arg parameter
 	for (int i = 1; i < argc; i++)
@@ -109,6 +114,10 @@ int main(int argc, char *argv[])
 			genesetFile = argv[i + 1];
 		else if (strcmp(argv[i], "-c") == 0)
 			classFile = argv[i + 1];
+		else if (strcmp(argv[i], "-l") == 0)
+			lambda = atof(argv[i + 1]);
+		else if (strcmp(argv[i], "-t") == 0)
+			theta = atof(argv[i + 1]);
 		else if (strcmp(argv[i], "-mp") == 0)
 			parentCap = atoi(argv[i + 1]);
 		else if (strcmp(argv[i], "-help") == 0 || strcmp(argv[i], "--help") == 0)
@@ -153,6 +162,9 @@ int main(int argc, char *argv[])
 		pw = 1.0; //no prior knowledge
 	}
 	printf("pw : %f\n", pw);
+
+    thresh = pow(theta,lambda);
+	printf("lambda : %f, theta : %f, threshold : %f\n", lambda, theta, thresh);
 	//end command line parser---------------------------------------------------------------------------------------
 
 	//expression data
@@ -736,7 +748,7 @@ int main(int argc, char *argv[])
 			//printf("c = %d\n", c);
 			if( c < MAX_THREADS)
 			{
-			run2 << <sampleSum, c, genes * genes * sizeof(int) >> >(genes, samples, samples2, dtriA, dtriAb, dspacr, dff, ddofout, dppn, dstf, dout23, c, dpriorMatrix, pw);
+			run2 << <sampleSum, c, genes * genes * sizeof(int) >> >(genes, samples, samples2, dtriA, dtriAb, dspacr, dff, ddofout, dppn, dstf, dout23, c, dpriorMatrix, pw, thresh);
 			}
 			else
 			{
@@ -744,7 +756,7 @@ int main(int argc, char *argv[])
 				int TPB = ceil((c * 1.0) / BPN);
 			
 				//printf("launching with %d blocks per network and %d threads per block\n", BPN, TPB);
-				run2Scalable <<< sampleSum * BPN, TPB>>>(genes, samples, samples2, dtriA, dtriAb,dspacr, dff, ddofout, dppn, dstf, dout23, c, dpriorMatrix, pw, BPN, TPB);
+				run2Scalable <<< sampleSum * BPN, TPB>>>(genes, samples, samples2, dtriA, dtriAb,dspacr, dff, ddofout, dppn, dstf, dout23, c, dpriorMatrix, pw, thresh, BPN, TPB);
 				//printf("run2Scalable completed\n");
 			}
 
