@@ -26,7 +26,7 @@ eddy-gpu has the following command line parameters:
 
 ```-mp``` maximum number of parents for each node
 
-```-p``` pvalue threshold for independence testing. [default = 0.05]
+```-p``` pvalue threshold for divergence significance testing. [default = 0.05]
 
 ```-r``` number of permutations for statistical significance testing. [default = 100]
 
