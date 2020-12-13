@@ -94,7 +94,7 @@ int main(int argc, char *argv[])
 	double pw = 0.0;  //default - no prior weight
 	//SK: below to be deleted
         //double pw = 1.0; //default - no prior weight
-	double pThreshold = .05; //default value
+	double pThreshold = .05; //default value (alpha) for statistical significance of DDN
     double theta = 0.8;
     double lambda = 2.0;
     double thresh;
@@ -125,7 +125,7 @@ int main(int argc, char *argv[])
 		else if (strcmp(argv[i], "-mp") == 0)
 			parentCap = atoi(argv[i + 1]);
 		else if (strcmp(argv[i], "-help") == 0 || strcmp(argv[i], "--help") == 0)
-			printf("Required arguments : \n -d input.txt\n -c classfile.txt\n -g geneset.txt -mp # of parents\n -p pvalue for independence testing\n");
+			printf("Required arguments : \n -d input.txt\n -c classfile.txt\n -g geneset.txt -mp # of parents\n -p pvalue for DDN significance testing\n");
 		else if (strcmp(argv[i], "-r") == 0)
 			perms = atoi(argv[i + 1]);
 		else if (strcmp(argv[i], "-pw") == 0)
@@ -173,7 +173,7 @@ int main(int argc, char *argv[])
     threshpw = pow(theta*(1-pw),(1/lambda));
     thresh = pow(theta,(1/lambda));
 	printf("lambda : %f, theta : %f\n", lambda, theta);
-	printf("edge threshold : %f, prior-weighted edge threshold\n", thresh, threshpw);
+	printf("edge threshold : %f, prior-weighted edge threshold: %f\n", thresh, threshpw);
 	//end command line parser---------------------------------------------------------------------------------------
 
 	//expression data
