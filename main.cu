@@ -91,7 +91,7 @@ int main(int argc, char *argv[])
 	//number of permutations
 	int perms = 0; // 1 permutation
 	//SK: to be consistent with the paper's description
-	double pw = 0.0;  //default - no prior weight
+	double pw = 0.5;  //default - half and half prior weight
 	//SK: below to be deleted
         //double pw = 1.0; //default - no prior weight
 	double pThreshold = .05; //default value (alpha) for statistical significance of DDN
@@ -164,12 +164,14 @@ int main(int argc, char *argv[])
 	if (pw < 0.0 || pw > 1.0)
 	{
 		//SK: to be consistent with the paperp's description
-		pw = 0.0; //no prior knowledge
+		pw = 0.5; //half and half prior knowledge
 		//SK: to be deleted
 		//pw = 1.0; //no prior knowledge
 	}
 	printf("pw : %f\n", pw);
 
+	// SK: with this, pw = 0 means no prior knowledge (so, full threshold cutoff)
+	//                pw = 1 means full prior knowledge (so, prior edge detected regardless of data)
     threshpw = pow(theta*(1-pw),(1/lambda));
     thresh = pow(theta,(1/lambda));
 	printf("lambda : %f, theta : %f\n", lambda, theta);
