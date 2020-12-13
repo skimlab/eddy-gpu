@@ -165,6 +165,12 @@ int main(int argc, char *argv[])
 
     thresh = pow(theta,(1/lambda));
 	printf("lambda : %f, theta : %f, threshold : %f\n", lambda, theta, thresh);
+	
+	//
+	//SK: to use the current codes in kernel1.cu as is
+	//
+	pw = pow(1-pw, (1/lambda));
+	
 	//end command line parser---------------------------------------------------------------------------------------
 
 	//expression data
