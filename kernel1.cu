@@ -426,7 +426,7 @@ __device__ void noStates(const int idx, const int noGenes, int samples1, int sam
 }
 
 __global__ void run2(const int noGenes, const int leng, const int lengb, int *tary, int *taryb, int  *spacr, int *ff,
-	int *dofout, int *ppn, int *stf, int *out, int c, int *priorMatrix, double pw, double thresh){
+	int *dofout, int *ppn, int *stf, int *out, int c, int *priorMatrix, double threshpw, double thresh){
 
 	int index = threadIdx.x + blockDim.x*blockIdx.x; //global thread
 	int tdx = threadIdx.x; //local thread
@@ -466,7 +466,7 @@ __global__ void run2(const int noGenes, const int leng, const int lengb, int *ta
 	//ones[index] = deviceGammds(((double)ones[index]) / 2, ((double)dofout[index]) / 2);
 	edgeVal = deviceGammds(edgeVal / 2, ((double)dofout[index]) / 2);
 	//if (ones[index] > .8)
-	if (edgeVal > thresh || (*(sharedMatrix + row * noGenes + col) == 1 && edgeVal > thresh * pw))
+	if (edgeVal > thresh || (*(sharedMatrix + row * noGenes + col) == 1 && edgeVal > threshpw ))
 	//if (edgeVal > .8)
 	{
 		out[index] = 1;
@@ -478,7 +478,7 @@ __global__ void run2(const int noGenes, const int leng, const int lengb, int *ta
 }
 
 __global__ void run2Scalable(const int noGenes, const int leng, const int lengb, int *tary, int *taryb, int *spacr, int *ff,
-							int *dofout, int *ppn, int *stf, int *out, int c, int *priorMatrix, double pw, double thresh, int BPN, int TPB)
+							int *dofout, int *ppn, int *stf, int *out, int c, int *priorMatrix, double threshpw, double thresh, int BPN, int TPB)
 {
 	int netId = blockIdx.x / BPN;
 	int localIdx = TPB * (blockIdx.x % BPN) + threadIdx.x;
@@ -506,7 +506,7 @@ __global__ void run2Scalable(const int noGenes, const int leng, const int lengb,
 	
 		edgeVal = deviceGammds(edgeVal / 2, ((double)dofout[globalIdx]) / 2);
 	
-		if(edgeVal > thresh || (*(priorMatrix + row * noGenes + col) == 1 && edgeVal > thresh * pw))
+		if(edgeVal > thresh || (*(priorMatrix + row * noGenes + col) == 1 && edgeVal > threshpw ))
 		{
 			out[globalIdx] = 1;
 		}

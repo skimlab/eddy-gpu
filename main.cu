@@ -95,6 +95,7 @@ int main(int argc, char *argv[])
     double theta = 0.8;
     double lambda = 2.0;
     double thresh;
+    double threshpw;
 
 	//-d for input
 	//-g for geneset
@@ -163,21 +164,10 @@ int main(int argc, char *argv[])
 	}
 	printf("pw : %f\n", pw);
 
+    threshpw = pow(theta*(1-pw),(1/lambda));
     thresh = pow(theta,(1/lambda));
-	printf("lambda : %f, theta : %f, threshold : %f\n", lambda, theta, thresh);
-	
-	//
-	//SK: to use the current codes in kernel1.cu as is
-	//    if pw == 1.0 means no prior knowledge as described above
-	//
-	//    However, pw in command line option should such that 
-	//       pw = 0 means no prior knowledge) and 
-	//       pw = 1 means full prior knowledge
-	//    to be consistent with the manuscript's description of
-	//       prior knowledge and Eq. 2 in https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4721243/
-	//
-	pw = pow(pw, (1/lambda));
-	
+	printf("lambda : %f, theta : %f\n", lambda, theta);
+	printf("edge threshold : %f, prior-weighted edge threshold\n", thresh, threshpw);
 	//end command line parser---------------------------------------------------------------------------------------
 
 	//expression data
@@ -761,7 +751,7 @@ int main(int argc, char *argv[])
 			//printf("c = %d\n", c);
 			if( c < MAX_THREADS)
 			{
-			run2 << <sampleSum, c, genes * genes * sizeof(int) >> >(genes, samples, samples2, dtriA, dtriAb, dspacr, dff, ddofout, dppn, dstf, dout23, c, dpriorMatrix, pw, thresh);
+			run2 << <sampleSum, c, genes * genes * sizeof(int) >> >(genes, samples, samples2, dtriA, dtriAb, dspacr, dff, ddofout, dppn, dstf, dout23, c, dpriorMatrix, threshpw, thresh);
 			}
 			else
 			{
@@ -769,7 +759,7 @@ int main(int argc, char *argv[])
 				int TPB = ceil((c * 1.0) / BPN);
 			
 				//printf("launching with %d blocks per network and %d threads per block\n", BPN, TPB);
-				run2Scalable <<< sampleSum * BPN, TPB>>>(genes, samples, samples2, dtriA, dtriAb,dspacr, dff, ddofout, dppn, dstf, dout23, c, dpriorMatrix, pw, thresh, BPN, TPB);
+				run2Scalable <<< sampleSum * BPN, TPB>>>(genes, samples, samples2, dtriA, dtriAb,dspacr, dff, ddofout, dppn, dstf, dout23, c, dpriorMatrix, threshpw, thresh, BPN, TPB);
 				//printf("run2Scalable completed\n");
 			}
 
