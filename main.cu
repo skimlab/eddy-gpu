@@ -90,7 +90,10 @@ int main(int argc, char *argv[])
 	int parentCap = 0;
 	//number of permutations
 	int perms = 0; // 1 permutation
-	double pw = 1.0; //default - no prior weight
+	//SK: to be consistent with the paper's description
+	double pw = 0.0;  //default - no prior weight
+	//SK: below to be deleted
+        //double pw = 1.0; //default - no prior weight
 	double pThreshold = .05; //default value
     double theta = 0.8;
     double lambda = 2.0;
@@ -160,7 +163,10 @@ int main(int argc, char *argv[])
 	printf("Permutations = %d\n", perms);
 	if (pw < 0.0 || pw > 1.0)
 	{
-		pw = 1.0; //no prior knowledge
+		//SK: to be consistent with the paperp's description
+		pw = 0.0; //no prior knowledge
+		//SK: to be deleted
+		//pw = 1.0; //no prior knowledge
 	}
 	printf("pw : %f\n", pw);
 
