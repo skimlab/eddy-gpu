@@ -102,8 +102,8 @@ int main(int argc, char *argv[])
 	//-mp for max parents
 	//-p for p threshold value
 	//-r number of permutations
-	//-t for theta
-	//-l for lambda
+	//-t for theta 
+	//-l for lambda 
 	//-pw prior weight = [0,1]
 	//loop through argv, determining location of each arg parameter
 	for (int i = 1; i < argc; i++)
@@ -163,7 +163,7 @@ int main(int argc, char *argv[])
 	}
 	printf("pw : %f\n", pw);
 
-    thresh = pow(theta,lambda);
+    thresh = pow(theta,(1/lambda));
 	printf("lambda : %f, theta : %f, threshold : %f\n", lambda, theta, thresh);
 	//end command line parser---------------------------------------------------------------------------------------
 
