@@ -168,8 +168,15 @@ int main(int argc, char *argv[])
 	
 	//
 	//SK: to use the current codes in kernel1.cu as is
+	//    if pw == 1.0 means no prior knowledge as described above
 	//
-	pw = pow(1-pw, (1/lambda));
+	//    However, pw in command line option should such that 
+	//       pw = 0 means no prior knowledge) and 
+	//       pw = 1 means full prior knowledge
+	//    to be consistent with the manuscript's description of
+	//       prior knowledge and Eq. 2 in https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4721243/
+	//
+	pw = pow(pw, (1/lambda));
 	
 	//end command line parser---------------------------------------------------------------------------------------
 
