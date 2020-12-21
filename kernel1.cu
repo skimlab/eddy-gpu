@@ -467,7 +467,7 @@ __global__ void run2(const int noGenes, const int leng, const int lengb, int *ta
 	edgeVal = deviceGammds(edgeVal / 2, ((double)dofout[index]) / 2);
 	
 	// Bonferroni correction
-	edgeVal = 1-(1-edgeVal)/((noGenes-1)*(noGenes-2)/2);
+	edgeVal = 1-min(1.0, (1-edgeVal)*((noGenes-1)*(noGenes-2)/2));
 		
 	//if (ones[index] > .8)
 	if (edgeVal > thresh || (*(sharedMatrix + row * noGenes + col) == 1 && edgeVal > threshpw ))
@@ -511,7 +511,7 @@ __global__ void run2Scalable(const int noGenes, const int leng, const int lengb,
 		edgeVal = deviceGammds(edgeVal / 2, ((double)dofout[globalIdx]) / 2);
 	
 		// Bonferroni correction
-		edgeVal = 1-(1-edgeVal)/((noGenes-1)*(noGenes-2)/2);
+		edgeVal = 1-min(1.0, (1-edgeVal)*((noGenes-1)*(noGenes-2)/2));
 
 		if(edgeVal > thresh || (*(priorMatrix + row * noGenes + col) == 1 && edgeVal > threshpw ))
 		{
