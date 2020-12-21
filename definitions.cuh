@@ -7,7 +7,7 @@
 #ifdef _WIN32
 const char DIR[20] = "PRIORS\\";
 #endif
-#ifdef linux
+#if defined(linux) || defined(__linux)
 const char DIR[20] = "PRIORS/";
 #include <errno.h>
 #endif
