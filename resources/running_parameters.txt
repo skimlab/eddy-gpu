@@ -1,0 +1,8 @@
+Succeeded (-rawp indicate no Bonferroni correction) :
+
+eddy-gpu -d GBApPD_vs_GBApUnaffected_Expression.txt -c GBApPD_vs_GBApUnaffected_ClassFile.txt -g failed.gmt -pE 0.05 -pw 0.5 -pD 0.1 -r 100
+
+Failed (default: Bonferroni correction) :
+
+eddy-gpu -d GBApPD_vs_GBApUnaffected_Expression.txt -c GBApPD_vs_GBApUnaffected_ClassFile.txt -g failed.gmt -pE 0.05 -rawp -pw 0.5 -pD 0.1 -r 100
+
