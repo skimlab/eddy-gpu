@@ -1,5 +1,5 @@
 # eddy-gpu
-EDDY-GPU is a parallel implementation  of the EDDY (Evaluation of Differential DependencY) algorithm developed by the Biocomputing Lab at TGen and now mainted at the CRI Center for Computational Systems Biology at Prairie View A&M University. It is to be used with NVIDIA's CUDA API for GPUs. The original **EDDY** paper can be found at https://www.ncbi.nlm.nih.gov/pubmed/24500204. The EDDY website can be found at http://biocomputing.tgen.org/software/EDDY/index.html.  
+EDDY-GPU is a parallel implementation  of the EDDY (Evaluation of Differential DependencY) algorithm developed by the Biocomputing Lab at TGen and now mainted at the CRI Center for Computational Systems Biology at Prairie View A&M University. It is to be used with NVIDIA's CUDA API for GPUs. The original **EDDY** paper can be found at https://www.ncbi.nlm.nih.gov/pubmed/24500204. The EDDY website can be found at http://biocomputing.tgen.org/software/EDDY/index.html (old; removed).  
 
 # Dependencies
 eddy-gpu requires the Boost C++ library - boost/math/special_functions/ - for its ibetac function. Make sure Boost is installed before running eddy-gpu.
