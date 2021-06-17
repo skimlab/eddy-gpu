@@ -17,9 +17,9 @@ const char DIR[20] = "PRIORS/";
 const int MAX_NUM_SAMPLES = 20000;
 const int MAX_LENGTH_NAME = 50; // this could be sample, class or gene name
 const int MAX_GENESET_SIZE = 200;
-const int MAX_BUFSIZE = 200000;  // this is used to read some data stream
-const int MAX_NUM_GENES = 20500; // assume we will use gene level data (gene
-                                 // symbols or entrez gene ids)
+const int MAX_BUFSIZE = 1500000;  // this is used to read some data stream
+const int MAX_NUM_GENES = 20500;  // assume we will use gene level data (gene
+                                  // symbols or entrez gene ids)
 
 // CPU methods
 static void HandleError(cudaError_t err, const char *file, int line);
